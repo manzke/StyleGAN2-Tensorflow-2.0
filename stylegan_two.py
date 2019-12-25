@@ -348,7 +348,7 @@ class StyleGAN(object):
         self.GAN.G.summary()
 
         #Data generator (my own code, not from TF 2.0)
-        self.im = dataGenerator(directory, im_size, flip = True)
+        self.im = dataGenerator(directory, im_size, BATCH_SIZE, flip = True)
 
         #Set up variables
         self.lastblip = time.clock()
@@ -374,7 +374,7 @@ class StyleGAN(object):
         apply_gradient_penalty = self.GAN.steps % 2 == 0 or self.GAN.steps < 10000
         apply_path_penalty = self.GAN.steps % 16 == 0
 
-        a, b, c, d = self.train_step(self.im.get_batch(BATCH_SIZE).astype('float32'), style, nImage(BATCH_SIZE), apply_gradient_penalty, apply_path_penalty)
+        a, b, c, d = self.train_step(self.im.get_batch(), style, nImage(BATCH_SIZE), apply_gradient_penalty, apply_path_penalty)
 
         #Adjust path length penalty mean
         #d = pl_mean when no penalty is applied
@@ -620,11 +620,6 @@ class StyleGAN(object):
 
         self.GAN.GenModel()
         self.GAN.GenModelA()
-
-
-
-
-
 
 
 
