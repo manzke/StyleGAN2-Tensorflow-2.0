@@ -73,7 +73,8 @@ def upsample(x):
     return K.resize_images(x,2,2,"channels_last",interpolation='bilinear')
 
 def upsample_to_size(x):
-    y = im_size / x.shape[2]
+    y = im_size // x.shape[2]
+    print(y)
     x = K.resize_images(x, y, y, "channels_last",interpolation='bilinear')
     return x
 

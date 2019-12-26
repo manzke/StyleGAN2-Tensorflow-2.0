@@ -62,8 +62,6 @@ class dataGenerator(object):
             
     def get_batch(self):
         self.update+=1
-        if not self.update % 10 :
-            print(self.update)
         return next(self.iterator)
 
 
