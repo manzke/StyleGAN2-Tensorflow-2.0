@@ -1,3 +1,12 @@
+A modification of StyleGAN2 Tensorflow 2.0 to make it easily runnable on colab. Using less storage thanks to tensorflow 2 data pipeline.
+
+Was tested on CelebA dataset. 
+
+
+
+# *original README*
+
+
 # StyleGAN2 Tensorflow 2.0
 
 Unofficial implementation of StyleGAN 2 using TensorFlow 2.0.

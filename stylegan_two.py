@@ -74,14 +74,12 @@ def upsample(x):
 
 def upsample_to_size(x):
     y = im_size // x.shape[2]
-    print(y)
     x = K.resize_images(x, y, y, "channels_last",interpolation='bilinear')
     return x
 
 
 #Blocks
 def g_block(inp, istyle, inoise, fil, u = True):
-
     if u:
         #Custom upsampling because of clone_model issue
         out = Lambda(upsample, output_shape=[None, inp.shape[2] * 2, inp.shape[2] * 2, None])(inp)
