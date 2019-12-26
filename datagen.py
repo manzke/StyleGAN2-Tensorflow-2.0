@@ -58,10 +58,11 @@ class dataGenerator(object):
 
         dataset = image_paths.map(im_preprocessing)
         dataset = dataset.repeat()
-        self.iterator = iter(dataset.batch(batch_size))
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.prefetch(1)
+        self.iterator = iter(dataset)
             
     def get_batch(self):
         self.update+=1
         return next(self.iterator)
-
-
+    

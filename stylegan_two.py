@@ -188,9 +188,9 @@ class GAN(object):
 
         x = d_block(x, 8 * cha)  #8
 
-        x = d_block(x, 16 * cha)  #4
+        x = d_block(x, 16 * cha, p = False)  #4
 
-        x = d_block(x, 32 * cha, p = False)  #4
+        #x = d_block(x, 32 * cha, p = False)  #4
 
         x = Flatten()(x)
 
@@ -238,25 +238,25 @@ class GAN(object):
         x = Dense(4*4*4*cha, activation = 'relu', kernel_initializer = 'random_normal')(x)
         x = Reshape([4, 4, 4*cha])(x)
 
-        x, r = g_block(x, inp_style[0], inp_noise, 32 * cha, u = False)  #4
+        #x, r = g_block(x, inp_style[0], inp_noise, 32 * cha, u = False)  #4
+        #outs.append(r)
+
+        x, r = g_block(x, inp_style[0], inp_noise, 16 * cha, u = False)  #8
         outs.append(r)
 
-        x, r = g_block(x, inp_style[1], inp_noise, 16 * cha)  #8
+        x, r = g_block(x, inp_style[1], inp_noise, 8 * cha)  #16
         outs.append(r)
 
-        x, r = g_block(x, inp_style[2], inp_noise, 8 * cha)  #16
+        x, r = g_block(x, inp_style[2], inp_noise, 6 * cha)  #32
         outs.append(r)
 
-        x, r = g_block(x, inp_style[3], inp_noise, 6 * cha)  #32
+        x, r = g_block(x, inp_style[3], inp_noise, 4 * cha)   #64
         outs.append(r)
 
-        x, r = g_block(x, inp_style[4], inp_noise, 4 * cha)   #64
+        x, r = g_block(x, inp_style[4], inp_noise, 2 * cha)   #128
         outs.append(r)
 
-        x, r = g_block(x, inp_style[5], inp_noise, 2 * cha)   #128
-        outs.append(r)
-
-        x, r = g_block(x, inp_style[6], inp_noise, 1 * cha)   #256
+        x, r = g_block(x, inp_style[5], inp_noise, 1 * cha)   #256
         outs.append(r)
 
         x = add(outs)
