@@ -73,13 +73,14 @@ def upsample(x):
     return K.resize_images(x,2,2,"channels_last",interpolation='bilinear')
 
 def upsample_to_size(x):
-    y = im_size // x.shape[2]
+    y = im_size / x.shape[2]
     x = K.resize_images(x, y, y, "channels_last",interpolation='bilinear')
     return x
 
 
 #Blocks
 def g_block(inp, istyle, inoise, fil, u = True):
+
     if u:
         #Custom upsampling because of clone_model issue
         out = Lambda(upsample, output_shape=[None, inp.shape[2] * 2, inp.shape[2] * 2, None])(inp)
@@ -188,9 +189,9 @@ class GAN(object):
 
         x = d_block(x, 8 * cha)  #8
 
-        x = d_block(x, 16 * cha, p = False)  #4
+        x = d_block(x, 16 * cha)  #4
 
-        #x = d_block(x, 32 * cha, p = False)  #4
+        x = d_block(x, 32 * cha, p = False)  #4
 
         x = Flatten()(x)
 
@@ -238,25 +239,25 @@ class GAN(object):
         x = Dense(4*4*4*cha, activation = 'relu', kernel_initializer = 'random_normal')(x)
         x = Reshape([4, 4, 4*cha])(x)
 
-        #x, r = g_block(x, inp_style[0], inp_noise, 32 * cha, u = False)  #4
-        #outs.append(r)
-
-        x, r = g_block(x, inp_style[0], inp_noise, 16 * cha, u = False)  #8
+        x, r = g_block(x, inp_style[0], inp_noise, 32 * cha, u = False)  #4
         outs.append(r)
 
-        x, r = g_block(x, inp_style[1], inp_noise, 8 * cha)  #16
+        x, r = g_block(x, inp_style[1], inp_noise, 16 * cha)  #8
         outs.append(r)
 
-        x, r = g_block(x, inp_style[2], inp_noise, 6 * cha)  #32
+        x, r = g_block(x, inp_style[2], inp_noise, 8 * cha)  #16
         outs.append(r)
 
-        x, r = g_block(x, inp_style[3], inp_noise, 4 * cha)   #64
+        x, r = g_block(x, inp_style[3], inp_noise, 6 * cha)  #32
         outs.append(r)
 
-        x, r = g_block(x, inp_style[4], inp_noise, 2 * cha)   #128
+        x, r = g_block(x, inp_style[4], inp_noise, 4 * cha)   #64
         outs.append(r)
 
-        x, r = g_block(x, inp_style[5], inp_noise, 1 * cha)   #256
+        x, r = g_block(x, inp_style[5], inp_noise, 2 * cha)   #128
+        outs.append(r)
+
+        x, r = g_block(x, inp_style[6], inp_noise, 1 * cha)   #256
         outs.append(r)
 
         x = add(outs)
@@ -623,6 +624,11 @@ class StyleGAN(object):
 
 
 
+
+
+
+
+
 if __name__ == "__main__":
     model = StyleGAN(lr = 0.0001, silent = False)
     model.evaluate(0)
@@ -632,7 +638,6 @@ if __name__ == "__main__":
 
     """
     model.load(31)
-
     n1 = noiseList(64)
     n2 = nImage(64)
     for i in range(50):
