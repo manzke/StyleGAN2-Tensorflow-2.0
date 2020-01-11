@@ -26,22 +26,15 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 
 class dataGenerator(object):
 
-    def __init__(self, folder, im_size, batch_size, flip = True, verbose = True):
-        self.folder = folder
+    def __init__(self, image_paths, im_size, batch_size, flip = True, verbose = True):
         self.im_size = im_size
         self.batch_size = batch_size
         self.flip = flip
         self.verbose = verbose
-
         self.segments = []
         self.images = []
         self.update = 0
-        
-        image_paths = tf.data.Dataset.list_files(folder + "*.jpg")
-        
-        if self.verbose:
-            print(tf.data.experimental.cardinality(image_paths).numpy(), "images found")
-
+            
         def im_preprocessing(im_path) :
             """
             Reading images from files, data augmentation should be here.

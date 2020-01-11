@@ -19,7 +19,7 @@ from conv_mod import *
 im_size = 256
 latent_size = 512
 BATCH_SIZE = 16
-directory = "Earth"
+dataset = None
 
 cha = 24
 
@@ -348,7 +348,7 @@ class StyleGAN(object):
         self.GAN.G.summary()
 
         #Data generator (my own code, not from TF 2.0)
-        self.im = dataGenerator(directory, im_size, BATCH_SIZE, flip = True)
+        self.im = dataGenerator(dataset, im_size, BATCH_SIZE, flip = True)
 
         #Set up variables
         self.lastblip = time.clock()
@@ -420,10 +420,10 @@ class StyleGAN(object):
             print()
 
             #Save Model
-            if self.GAN.steps % 500 == 0:
+            if self.GAN.steps % 2000 == 0:
                 self.save(floor(self.GAN.steps / 10000))
-            if self.GAN.steps % 1000 == 0 or (self.GAN.steps % 100 == 0 and self.GAN.steps < 2500):
-                self.evaluate(floor(self.GAN.steps / 1000))
+            if self.GAN.steps % 2000 == 0 or (self.GAN.steps % 500 == 0 and self.GAN.steps < 2500):
+                self.evaluate(floor(self.GAN.steps / 2000))
 
 
         printProgressBar(self.GAN.steps % 100, 99, decimals = 0)
