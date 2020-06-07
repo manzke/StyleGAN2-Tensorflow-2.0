@@ -1,3 +1,6 @@
+Original work: https://github.com/manicman1999/StyleGAN2-Tensorflow-2.0
+This fork includes no functional changes
+
 # StyleGAN2 Tensorflow 2.0
 
 Unofficial implementation of StyleGAN 2 using TensorFlow 2.0.
