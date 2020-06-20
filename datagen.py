@@ -32,8 +32,9 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 
 class dataGenerator(object):
 
-    def __init__(self, folder, im_size, mss = (1024 ** 3), flip = True, verbose = True):
-        self.folder = folder
+    def __init__(self, path, dataset, im_size, mss = (1024 ** 3), flip = True, verbose = True):
+        self.path = path
+        self.dataset = dataset
         self.im_size = im_size
         self.segment_length = mss // (im_size * im_size * 3)
         self.flip = flip
@@ -48,22 +49,22 @@ class dataGenerator(object):
             print("Maximum Segment Size: ", self.segment_length)
 
         try:
-            os.mkdir("data/" + self.folder + "-npy-" + str(self.im_size))
+            os.mkdir(self.path + "/" + self.dataset + "-npy-" + str(self.im_size))
         except:
-            self.load_from_npy(folder)
+            self.load_from_npy()
             return
 
-        self.folder_to_npy(self.folder)
-        self.load_from_npy(self.folder)
+        self.folder_to_npy()
+        self.load_from_npy()
 
-    def folder_to_npy(self, folder):
+    def folder_to_npy(self):
 
         if self.verbose:
             print("Converting from images to numpy files...")
 
         names = []
 
-        for dirpath, dirnames, filenames in os.walk("data/" + folder):
+        for dirpath, dirnames, filenames in os.walk(self.path + '/' + self.dataset):
             for filename in [f for f in filenames if (f.endswith(".jpg") or f.endswith(".png") or f.endswith(".JPEG"))]:
                 fname = os.path.join(dirpath, filename)
                 names.append(fname)
@@ -93,19 +94,19 @@ class dataGenerator(object):
             kn = kn + 1
 
             if kn >= self.segment_length:
-                np.save("data/" + folder + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
+                np.save(self.path + "/" + self.dataset + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
 
                 segment = []
                 kn = 0
                 sn = sn + 1
 
 
-        np.save("data/" + folder + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
+        np.save(self.path + "/" + self.dataset + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
 
 
-    def load_from_npy(self, folder):
+    def load_from_npy(self):
 
-        for dirpath, dirnames, filenames in os.walk("data/" + folder + "-npy-" + str(self.im_size)):
+        for dirpath, dirnames, filenames in os.walk(self.path + "/" + self.dataset + "-npy-" + str(self.im_size)):
             for filename in [f for f in filenames if f.endswith(".npy")]:
                 self.segments.append(os.path.join(dirpath, filename))
 
@@ -125,7 +126,7 @@ class dataGenerator(object):
     def get_batch(self, num):
 
         if self.update > self.images.shape[0]:
-            self.load_from_npy(self.folder)
+            self.load_from_npy()
 
         self.update = self.update + num
 
@@ -138,5 +139,3 @@ class dataGenerator(object):
                 out[-1] = np.flip(out[-1], 1)
 
         return np.array(out).astype('float32') / 255.0
-
-

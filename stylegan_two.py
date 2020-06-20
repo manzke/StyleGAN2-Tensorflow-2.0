@@ -6,12 +6,16 @@ from functools import partial
 from random import random
 import os
 
-from tensorflow.keras.layers import *
-from tensorflow.keras.models import *
-from tensorflow.keras.optimizers import *
-from tensorflow.keras.initializers import *
 import tensorflow as tf
+from tensorflow import keras
 import tensorflow.keras.backend as K
+from tensorflow.keras.layers import Input, Dense, Flatten, Lambda, Reshape
+from tensorflow.keras.layers import Conv2D, AveragePooling2D
+from tensorflow.keras.layers import Activation, LeakyReLU
+from tensorflow.keras.layers import add
+from tensorflow.keras.models import Sequential, Model, clone_model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.initializers import VarianceScaling
 
 from datagen import dataGenerator, printProgressBar
 from conv_mod import *
@@ -19,7 +23,6 @@ from conv_mod import *
 im_size = 256
 latent_size = 512
 BATCH_SIZE = 16
-directory = "Earth"
 
 cha = 24
 
@@ -73,7 +76,7 @@ def upsample(x):
     return K.resize_images(x,2,2,"channels_last",interpolation='bilinear')
 
 def upsample_to_size(x):
-    y = im_size / x.shape[2]
+    y = im_size // x.shape[2]
     x = K.resize_images(x, y, y, "channels_last",interpolation='bilinear')
     return x
 
@@ -338,7 +341,21 @@ class GAN(object):
 
 class StyleGAN(object):
 
-    def __init__(self, steps = 1, lr = 0.0001, decay = 0.00001, silent = True):
+    def __init__(self, steps = 1, lr = 0.0001, decay = 0.00001,*,
+                 verbose = True,
+                 max_steps=1000000,
+                 im_size,
+                 data_dir='Data', dataset,
+                 models_dir='Models', results_dir='Results'):
+
+        self.data_dir = data_dir + '/'
+        self.dataset = dataset
+        self.models_dir = models_dir + '/'
+        self.results_dir = results_dir + '/'
+
+        self.max_steps=max_steps
+
+        self.im_size = im_size
 
         #Init GAN and Eval Models
         self.GAN = GAN(steps = steps, lr = lr, decay = decay)
@@ -348,16 +365,15 @@ class StyleGAN(object):
         self.GAN.G.summary()
 
         #Data generator (my own code, not from TF 2.0)
-        self.im = dataGenerator(directory, im_size, flip = True)
+        self.im = dataGenerator(self.data_dir, self.dataset, self.im_size, flip = True, verbose = verbose)
 
         #Set up variables
-        self.lastblip = time.clock()
+        self.lastblip = time.time()
 
-        self.silent = silent
+        self.verbose = verbose
 
         self.ones = np.ones((BATCH_SIZE, 1), dtype=np.float32)
         self.zeros = np.zeros((BATCH_SIZE, 1), dtype=np.float32)
-        self.nones = -self.ones
 
         self.pl_mean = 0
         self.av = np.zeros([44])
@@ -374,7 +390,7 @@ class StyleGAN(object):
         apply_gradient_penalty = self.GAN.steps % 2 == 0 or self.GAN.steps < 10000
         apply_path_penalty = self.GAN.steps % 16 == 0
 
-        a, b, c, d = self.train_step(self.im.get_batch(BATCH_SIZE).astype('float32'), style, nImage(BATCH_SIZE), apply_gradient_penalty, apply_path_penalty)
+        a, b, c, d = self.old_train_step(self.im.get_batch(BATCH_SIZE).astype('float32'), style, nImage(BATCH_SIZE), apply_gradient_penalty, apply_path_penalty)
 
         #Adjust path length penalty mean
         #d = pl_mean when no penalty is applied
@@ -394,14 +410,14 @@ class StyleGAN(object):
 
 
         #Print info
-        if self.GAN.steps % 100 == 0 and not self.silent:
+        if self.GAN.steps % 100 == 0 and self.verbose:
             print("\n\nRound " + str(self.GAN.steps) + ":")
             print("D:", np.array(a))
             print("G:", np.array(b))
             print("PL:", self.pl_mean)
 
-            s = round((time.clock() - self.lastblip), 4)
-            self.lastblip = time.clock()
+            s = round((time.time() - self.lastblip), 4)
+            self.lastblip = time.time()
 
             steps_per_second = 100 / s
             steps_per_minute = steps_per_second * 60
@@ -412,7 +428,7 @@ class StyleGAN(object):
             min1k = floor(1000/steps_per_minute)
             sec1k = floor(1000/steps_per_second) % 60
             print("1k Steps: " + str(min1k) + ":" + str(sec1k))
-            steps_left = 200000 - self.GAN.steps + 1e-7
+            steps_left = self.max_steps - self.GAN.steps + 1e-7
             hours_left = steps_left // steps_per_hour
             minutes_left = (steps_left // steps_per_minute) % 60
 
@@ -431,7 +447,7 @@ class StyleGAN(object):
         self.GAN.steps = self.GAN.steps + 1
 
     @tf.function
-    def train_step(self, images, style, noise, perform_gp = True, perform_pl = False):
+    def old_train_step(self, images, style, noise, perform_gp = True, perform_pl = False):
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             #Get style information
@@ -501,7 +517,7 @@ class StyleGAN(object):
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+".png")
+        x.save(self.results_dir + "i"+str(num)+".png")
 
         # Moving Average
 
@@ -518,7 +534,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+"-ema.png")
+        x.save(self.results_dir + "i"+str(num)+"-ema.png")
 
         #Mixing Regularities
         nn = noise(8)
@@ -544,7 +560,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+"-mr.png")
+        x.save(self.results_dir + "i"+str(num)+"-mr.png")
 
     def generateTruncated(self, style, noi = np.zeros([44]), trunc = 0.5, outImage = False, num = 0):
 
@@ -577,25 +593,25 @@ class StyleGAN(object):
 
             x = Image.fromarray(np.uint8(c1*255))
 
-            x.save("Results/t"+str(num)+".png")
+            x.save(self.resuls_dir + "t"+str(num)+".png")
 
         return generated_images
 
     def saveModel(self, model, name, num):
         json = model.to_json()
-        with open("Models/"+name+".json", "w") as json_file:
+        with open(self.models_dir+name+".json", "w") as json_file:
             json_file.write(json)
 
-        model.save_weights("Models/"+name+"_"+str(num)+".h5")
+        model.save_weights(self.models_dir+name+"_"+str(num)+".h5")
 
     def loadModel(self, name, num):
 
-        file = open("Models/"+name+".json", 'r')
+        file = open(self.models_dir+name+".json", 'r')
         json = file.read()
         file.close()
 
         mod = model_from_json(json, custom_objects = {'Conv2DMod': Conv2DMod})
-        mod.load_weights("Models/"+name+"_"+str(num)+".h5")
+        mod.load_weights(self.models_dir+name+"_"+str(num)+".h5")
 
         return mod
 
@@ -630,10 +646,10 @@ class StyleGAN(object):
 
 
 if __name__ == "__main__":
-    model = StyleGAN(lr = 0.0001, silent = False)
+    model = StyleGAN(lr = 0.0001, verbose = True)
     model.evaluate(0)
 
-    while model.GAN.steps < 1000001:
+    while model.GAN.steps <= model.max_steps:
         model.train()
 
     """
