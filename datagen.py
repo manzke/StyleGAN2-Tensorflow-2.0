@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os
+import random
 
 # Print iterations progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█'):
@@ -54,7 +55,7 @@ class dataGenerator(object):
             random_right = im_size - random.randint(0, im_size // 20)
             new_height = random_bottom-random_top
             new_width = random_right-random_left
-            im = tf.image.crop_to_bounding_box(im2, random_top, random_left, new_height, new_width)
+            im = tf.image.crop_to_bounding_box(im, random_top, random_left, new_height, new_width)
                 
             im = tf.image.resize(im, (im_size,im_size))
             return im
