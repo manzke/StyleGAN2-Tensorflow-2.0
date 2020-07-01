@@ -427,9 +427,9 @@ class StyleGAN(object):
             print()
 
             #Save Model
-            if self.GAN.steps % 1000 == 0:
-                self.save(floor(self.GAN.steps / 1000))
-                self.evaluate(floor(self.GAN.steps / 1000))
+            if self.GAN.steps % 10000 == 0:
+                self.save(floor(self.GAN.steps / 10000))
+                self.evaluate(floor(self.GAN.steps / 10000))
 
 
         printProgressBar(self.GAN.steps % 100, 99, decimals = 0)
