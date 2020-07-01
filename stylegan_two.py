@@ -73,7 +73,7 @@ def upsample(x):
     return K.resize_images(x,2,2,"channels_last",interpolation='bilinear')
 
 def upsample_to_size(x):
-    y = im_size / x.shape[2]
+    y = im_size // x.shape[2]
     x = K.resize_images(x, y, y, "channels_last",interpolation='bilinear')
     return x
 
@@ -420,10 +420,9 @@ class StyleGAN(object):
             print()
 
             #Save Model
-            if self.GAN.steps % 2000 == 0:
-                self.save(floor(self.GAN.steps / 10000))
-            if self.GAN.steps % 2000 == 0 or (self.GAN.steps % 500 == 0 and self.GAN.steps < 2500):
-                self.evaluate(floor(self.GAN.steps / 2000))
+            if self.GAN.steps % 1000 == 0:
+                self.save(floor(self.GAN.steps / 1000))
+                self.evaluate(floor(self.GAN.steps / 1000))
 
 
         printProgressBar(self.GAN.steps % 100, 99, decimals = 0)
@@ -501,7 +500,7 @@ class StyleGAN(object):
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+".png")
+        x.save("Results/i"+str(num).zfill(3)+".jpg")
 
         # Moving Average
 
@@ -518,7 +517,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+"-ema.png")
+#        x.save("Results/i"+str(num)+"-ema.png")
 
         #Mixing Regularities
         nn = noise(8)
@@ -544,7 +543,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num)+"-mr.png")
+#        x.save("Results/i"+str(num)+"-mr.png")
 
     def generateTruncated(self, style, noi = np.zeros([44]), trunc = 0.5, outImage = False, num = 0):
 
@@ -620,6 +619,7 @@ class StyleGAN(object):
 
         self.GAN.GenModel()
         self.GAN.GenModelA()
+        self.GAN.steps = num * 1000
 
 
 
