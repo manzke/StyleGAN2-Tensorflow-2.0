@@ -218,7 +218,14 @@ class GAN(object):
         self.S.add(LeakyReLU(0.2))
         self.S.add(Dense(512))
         self.S.add(LeakyReLU(0.2))
-
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
 
         # === Generator ===
 
