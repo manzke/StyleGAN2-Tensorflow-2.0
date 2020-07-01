@@ -197,7 +197,7 @@ class GAN(object):
 
         x = Dense(1, kernel_initializer = 'he_uniform')(x)
 
-        self.D = Model(inputs = inp, outputs = x)
+        self.D = Model(inputs = inp, outputs = x, name = "Descriminator")
 
         return self.D
 
@@ -208,7 +208,7 @@ class GAN(object):
 
         # === Style Mapping ===
 
-        self.S = Sequential()
+        self.S = Sequential(name="Style")
 
         self.S.add(Dense(512, input_shape = [latent_size]))
         self.S.add(LeakyReLU(0.2))
@@ -271,7 +271,7 @@ class GAN(object):
 
         x = Lambda(lambda y: y/2 + 0.5)(x) #Use values centered around 0, but normalize to [0, 1], providing better initialization
 
-        self.G = Model(inputs = inp_style + [inp_noise], outputs = x)
+        self.G = Model(inputs = inp_style + [inp_noise], outputs = x, name="Generator")
 
         return self.G
 
@@ -352,7 +352,9 @@ class StyleGAN(object):
         self.GAN.GenModel()
         self.GAN.GenModelA()
 
+        self.GAN.S.summary()
         self.GAN.G.summary()
+        self.GAN.D.summary()
 
         #Data generator (my own code, not from TF 2.0)
         self.im = dataGenerator(dataset, im_size, BATCH_SIZE, flip = True)
