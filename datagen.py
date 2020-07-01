@@ -43,8 +43,18 @@ class dataGenerator(object):
             im = tf.io.decode_jpeg(im_file, channels=3)
             im = tf.image.resize(im, (im_size,im_size))
             im = tf.image.convert_image_dtype(im, tf.float32)/255
-            if flip :
-                im = tf.image.random_flip_left_right(im)
+            
+            im = tf.image.random_flip_left_right(im)
+            im = tf.image.random_hue(im, 0.1)
+            im = tf.image.rot90(im, random.randint(0, 3))
+            
+            random_top = random.randint(0, im_size // 20)
+            random_left = random.randint(0, im_size // 20)
+            random_bottom = im_size - random.randint(0, im_size // 20)
+            random_right = im_size - random.randint(0, im_size // 20)
+            new_height = random_bottom-random_top
+            new_width = random_right-random_left
+            im = tf.image.crop_to_bounding_box(im2, random_top, random_left, new_height, new_width)
                 
             im = tf.image.resize(im, (im_size,im_size))
             return im
