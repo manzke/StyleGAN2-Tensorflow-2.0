@@ -596,7 +596,7 @@ class StyleGAN(object):
         with open(model_dir+name+".json", "w") as json_file:
             json_file.write(json)
 
-        model.save_weights(model_dir"+name+"_"+str(num)+".h5")
+        model.save_weights(model_dir+name+"_"+str(num)+".h5")
 
     def loadModel(self, name, num):
 
