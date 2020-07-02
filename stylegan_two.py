@@ -21,6 +21,8 @@ latent_size = 512
 BATCH_SIZE = 16
 dataset = None
 
+model_dir = '/content/drive/My Drive/results_os_256_week4/'
+
 cha = 24
 
 n_layers = int(log2(im_size) - 1)
@@ -509,7 +511,7 @@ class StyleGAN(object):
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1*255))
 
-        x.save("Results/i"+str(num).zfill(3)+".jpg")
+        x.save(model_dir + "i"+str(num).zfill(3)+".jpg")
 
         # Moving Average
 
@@ -585,25 +587,25 @@ class StyleGAN(object):
 
             x = Image.fromarray(np.uint8(c1*255))
 
-            x.save("Results/t"+str(num)+".png")
+            x.save(model_dir+"t"+str(num)+".jpg")
 
         return generated_images
 
     def saveModel(self, model, name, num):
         json = model.to_json()
-        with open("Models/"+name+".json", "w") as json_file:
+        with open(model_dir+name+".json", "w") as json_file:
             json_file.write(json)
 
-        model.save_weights("Models/"+name+"_"+str(num)+".h5")
+        model.save_weights(model_dir"+name+"_"+str(num)+".h5")
 
     def loadModel(self, name, num):
 
-        file = open("Models/"+name+".json", 'r')
+        file = open(model_dir+name+".json", 'r')
         json = file.read()
         file.close()
 
         mod = model_from_json(json, custom_objects = {'Conv2DMod': Conv2DMod})
-        mod.load_weights("Models/"+name+"_"+str(num)+".h5")
+        mod.load_weights(model_dir+name+"_"+str(num)+".h5")
 
         return mod
 
