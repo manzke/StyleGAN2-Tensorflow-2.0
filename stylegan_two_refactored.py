@@ -13,7 +13,7 @@ from tensorflow.keras.initializers import *
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
-from datagen import dataGenerator, printProgressBar
+from datagen import printProgressBar
 from conv_mod import *
 
 im_size = 256
@@ -44,7 +44,6 @@ def nImage(n):
     return np.random.uniform(0.0, 1.0, size = [n, im_size, im_size, 1]).astype('float32')
 
 
-#Loss functions
 def gradient_penalty(samples, output, weight):
     gradients = K.gradients(output, samples)[0]
     gradients_sqr = K.square(gradients)
@@ -53,18 +52,17 @@ def gradient_penalty(samples, output, weight):
 
     # (weight / 2) * ||grad||^2
     # Penalize the gradient norm
-    return K.mean(gradient_penalty) * weight
+    return K.mean(gradient_penalty) * weight * 0.5
 
-def hinge_d(y_true, y_pred):
-    return K.mean(K.relu(1.0 + (y_true * y_pred)))
-
-def w_loss(y_true, y_pred):
-    return K.mean(y_true * y_pred)
+# def hinge_d(y_true, y_pred):
+#     return K.mean(K.relu(1.0 + (y_true * y_pred)))
+#
+# def w_loss(y_true, y_pred):
+#     return K.mean(y_true * y_pred)
 
 
 #Lambdas
 def crop_to_fit(x):
-
     height = x[1].shape[1]
     width = x[1].shape[2]
 
@@ -81,7 +79,6 @@ def upsample_to_size(x):
 
 #Blocks
 def g_block(inp, istyle, inoise, fil, u = True):
-
     if u:
         #Custom upsampling because of clone_model issue
         out = Lambda(upsample, output_shape=[None, inp.shape[2] * 2, inp.shape[2] * 2, None])(inp)
@@ -107,7 +104,6 @@ def g_block(inp, istyle, inoise, fil, u = True):
     return out, to_rgb(out, rgb_style)
 
 def d_block(inp, fil, p = True):
-
     res = Conv2D(fil, 1, kernel_initializer = 'he_uniform')(inp)
 
     out = Conv2D(filters = fil, kernel_size = 3, padding = 'same', kernel_initializer = 'he_uniform')(inp)
@@ -156,14 +152,14 @@ class GAN(object):
         #Config
         self.LR = lr
         self.steps = steps
-        self.beta = 0.999
+        self.beta = 0.99
 
         #Init Models
         self.discriminator()
         self.generator()
 
-        self.GMO = Adam(lr = self.LR, beta_1 = 0, beta_2 = 0.999)
-        self.DMO = Adam(lr = self.LR, beta_1 = 0, beta_2 = 0.999)
+        self.GMO = Adam(lr = self.LR, beta_1 = 0, beta_2 = 0.99)
+        self.DMO = Adam(lr = self.LR, beta_1 = 0, beta_2 = 0.99)
 
         self.GE = clone_model(self.G)
         self.GE.set_weights(self.G.get_weights())
@@ -184,7 +180,7 @@ class GAN(object):
         x = d_block(x, 16 * cha)  #4
         x = d_block(x, 32 * cha, p = False)  #4
 
-        x = Flatten()(x)
+        x = Flatten()(x) # Todo: change to patchGAN?
         x = Dense(1, kernel_initializer = 'he_uniform')(x)
 
         self.D = Model(inputs = inp, outputs = x)
@@ -195,9 +191,7 @@ class GAN(object):
             return self.G
 
         # === Style Mapping ===
-
         self.S = Sequential()
-
         self.S.add(Dense(512, input_shape = [latent_size]))
         self.S.add(LeakyReLU(0.2))
         self.S.add(Dense(512))
@@ -208,7 +202,6 @@ class GAN(object):
         self.S.add(LeakyReLU(0.2))
 
         # === Generator ===
-
         #Inputs
         inp_style = []
         for i in range(n_layers):
@@ -332,7 +325,7 @@ class StyleGAN(object):
         apply_gradient_penalty = self.GAN.steps % 2 == 0 or self.GAN.steps < 10000
         apply_path_penalty = self.GAN.steps % 16 == 0
 
-        batch = self.im.next()#.astype('float32')
+        batch = self.im.next()
         a, b, c, d = self.train_step(batch, style, nImage(BATCH_SIZE), apply_gradient_penalty, apply_path_penalty)
 
         #Adjust path length penalty mean
@@ -402,9 +395,9 @@ class StyleGAN(object):
             real_output = self.GAN.D(images, training=True)
             fake_output = self.GAN.D(generated_images, training=True)
 
-            #Hinge loss function
-            gen_loss = K.mean(fake_output)
-            divergence = K.mean(K.relu(1 + real_output) + K.relu(1 - fake_output))
+            #Loss functions
+            gen_loss = tf.reduce_mean(tf.nn.softplus(fake_output)) # Logistic NS
+            divergence = tf.reduce_mean(tf.nn.softplus(fake_output) + tf.nn.softplus(-real_output))  # -log(1-sigmoid(fake_scores_out)) -log(sigmoid(real_scores_out))
             disc_loss = divergence
 
             if perform_gp:
@@ -500,7 +493,6 @@ class StyleGAN(object):
             noi = nImage(64)
 
         w_space = []
-        pl_lengths = self.pl_mean
         for i in range(len(style)):
             tempStyle = self.GAN.S.predict(style[i])
             tempStyle = trunc * (tempStyle - self.av) + self.av
