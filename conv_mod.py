@@ -65,7 +65,7 @@ class Conv2DMod(Layer):
 
     def call(self, inputs):
 
-        #To channels last
+        #To channels first
         x = tf.transpose(inputs[0], [0, 3, 1, 2])
 
         #Get weight and bias modulations
