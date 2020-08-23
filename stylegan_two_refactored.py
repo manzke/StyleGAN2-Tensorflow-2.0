@@ -12,6 +12,7 @@ from tensorflow.keras.optimizers import *
 from tensorflow.keras.initializers import *
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from tensorflow.keras.losses import BinaryCrossentropy
 
 from datagen import printProgressBar
 from conv_mod import *
@@ -314,6 +315,9 @@ class StyleGAN(object):
         self.pl_mean = 0
         self.av = np.zeros([44])
 
+        # Losses
+        self.bce = BinaryCrossentropy(from_logits=True)
+
     def train(self):
         #Train Alternating
         if random() < mixed_prob:
@@ -396,8 +400,11 @@ class StyleGAN(object):
             fake_output = self.GAN.D(generated_images, training=True)
 
             #Loss functions
-            gen_loss = tf.reduce_mean(tf.nn.softplus(fake_output)) # Logistic NS
-            divergence = tf.reduce_mean(tf.nn.softplus(fake_output) + tf.nn.softplus(-real_output))  # -log(1-sigmoid(fake_scores_out)) -log(sigmoid(real_scores_out))
+            # Todo: Try Spectral Normalisation of Discriminator (as alternative to GP)
+            gen_loss = self.bce(tf.ones_like(fake_output), fake_output) # Logistic NS
+            real_disc_loss = self.bce(tf.ones_like(real_output), real_output)
+            fake_disc_loss = self.bce(tf.zeros_like(fake_output), fake_output)
+            divergence = real_disc_loss + fake_disc_loss # -log(1-sigmoid(fake_scores_out)) -log(sigmoid(real_scores_out))
             disc_loss = divergence
 
             if perform_gp:
