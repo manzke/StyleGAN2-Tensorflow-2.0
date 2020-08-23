@@ -142,7 +142,6 @@ def from_rgb(inp, conc = None):
 class GAN(object):
 
     def __init__(self, steps = 1, lr = 0.0001, decay = 0.00001):
-
         #Models
         self.D = None
         self.S = None
@@ -173,37 +172,25 @@ class GAN(object):
         self.SE.set_weights(self.S.get_weights())
 
     def discriminator(self):
-
         if self.D:
             return self.D
 
         inp = Input(shape = [im_size, im_size, 3])
-
-
         x = d_block(inp, 1 * cha)   #128
-
         x = d_block(x, 2 * cha)   #64
-
         x = d_block(x, 4 * cha)   #32
-
         x = d_block(x, 6 * cha)  #16
-
         x = d_block(x, 8 * cha)  #8
-
         x = d_block(x, 16 * cha)  #4
-
         x = d_block(x, 32 * cha, p = False)  #4
 
         x = Flatten()(x)
-
         x = Dense(1, kernel_initializer = 'he_uniform')(x)
 
         self.D = Model(inputs = inp, outputs = x)
-
         return self.D
 
     def generator(self):
-
         if self.G:
             return self.G
 
@@ -220,15 +207,12 @@ class GAN(object):
         self.S.add(Dense(512))
         self.S.add(LeakyReLU(0.2))
 
-
         # === Generator ===
 
         #Inputs
         inp_style = []
-
         for i in range(n_layers):
             inp_style.append(Input([512]))
-
         inp_noise = Input([im_size, im_size, 1])
 
         #Latent
@@ -239,40 +223,29 @@ class GAN(object):
         #Actual Model
         x = Dense(4*4*4*cha, activation = 'relu', kernel_initializer = 'random_normal')(x)
         x = Reshape([4, 4, 4*cha])(x)
-
         x, r = g_block(x, inp_style[0], inp_noise, 32 * cha, u = False)  #4
         outs.append(r)
-
         x, r = g_block(x, inp_style[1], inp_noise, 16 * cha)  #8
         outs.append(r)
-
         x, r = g_block(x, inp_style[2], inp_noise, 8 * cha)  #16
         outs.append(r)
-
         x, r = g_block(x, inp_style[3], inp_noise, 6 * cha)  #32
         outs.append(r)
-
         x, r = g_block(x, inp_style[4], inp_noise, 4 * cha)   #64
         outs.append(r)
-
         x, r = g_block(x, inp_style[5], inp_noise, 2 * cha)   #128
         outs.append(r)
-
         x, r = g_block(x, inp_style[6], inp_noise, 1 * cha)   #256
         outs.append(r)
 
         x = add(outs)
-
         x = Lambda(lambda y: y/2 + 0.5)(x) #Use values centered around 0, but normalize to [0, 1], providing better initialization
 
         self.G = Model(inputs = inp_style + [inp_noise], outputs = x)
-
         return self.G
 
     def GenModel(self):
-
         #Generator Model for Evaluation
-
         inp_style = []
         style = []
 
@@ -281,15 +254,12 @@ class GAN(object):
             style.append(self.S(inp_style[-1]))
 
         inp_noise = Input([im_size, im_size, 1])
-
         gf = self.G(style + [inp_noise])
 
         self.GM = Model(inputs = inp_style + [inp_noise], outputs = gf)
-
         return self.GM
 
     def GenModelA(self):
-
         #Parameter Averaged Generator Model
 
         inp_style = []
@@ -300,17 +270,13 @@ class GAN(object):
             style.append(self.SE(inp_style[-1]))
 
         inp_noise = Input([im_size, im_size, 1])
-
         gf = self.GE(style + [inp_noise])
 
         self.GMA = Model(inputs = inp_style + [inp_noise], outputs = gf)
-
         return self.GMA
 
     def EMA(self):
-
         #Parameter Averaging
-
         for i in range(len(self.G.layers)):
             up_weight = self.G.layers[i].get_weights()
             old_weight = self.GE.layers[i].get_weights()
@@ -334,37 +300,28 @@ class GAN(object):
 
 
 
-
-
-
 class StyleGAN(object):
 
     def __init__(self, dataset, steps = 1, lr = 0.0001, decay = 0.00001, silent = True):
-
         #Init GAN and Eval Models
         self.GAN = GAN(steps = steps, lr = lr, decay = decay)
         self.GAN.GenModel()
         self.GAN.GenModelA()
-
         self.GAN.G.summary()
 
-        #Data generator (my own code, not from TF 2.0)
+        #Data generator
         self.im = iter(dataset)
 
         #Set up variables
         self.lastblip = time.clock()
-
         self.silent = silent
-
         self.ones = np.ones((BATCH_SIZE, 1), dtype=np.float32)
         self.zeros = np.zeros((BATCH_SIZE, 1), dtype=np.float32)
         self.nones = -self.ones
-
         self.pl_mean = 0
         self.av = np.zeros([44])
 
     def train(self):
-
         #Train Alternating
         if random() < mixed_prob:
             style = mixedList(BATCH_SIZE)
@@ -393,7 +350,6 @@ class StyleGAN(object):
         if np.isnan(a):
             print("NaN Value Error.")
             exit()
-
 
         #Print info
         if self.GAN.steps % 100 == 0 and not self.silent:
@@ -427,14 +383,11 @@ class StyleGAN(object):
             if self.GAN.steps % 1000 == 0 or (self.GAN.steps % 100 == 0 and self.GAN.steps < 2500):
                 self.evaluate(floor(self.GAN.steps / 1000))
 
-
         printProgressBar(self.GAN.steps % 100, 99, decimals = 0)
-
         self.GAN.steps = self.GAN.steps + 1
 
     @tf.function
     def train_step(self, images, style, noise, perform_gp = True, perform_pl = False):
-
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             #Get style information
             w_space = []
@@ -486,40 +439,32 @@ class StyleGAN(object):
         return disc_loss, gen_loss, divergence, pl_lengths
 
     def evaluate(self, num = 0, trunc = 1.0):
-
         n1 = noiseList(64)
         n2 = nImage(64)
         trunc = np.ones([64, 1]) * trunc
 
-
         generated_images = self.GAN.GM.predict(n1 + [n2], batch_size = BATCH_SIZE)
 
         r = []
-
         for i in range(0, 64, 8):
             r.append(np.concatenate(generated_images[i:i+8], axis = 1))
 
         c1 = np.concatenate(r, axis = 0)
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1*255))
-
         x.save("Results/i"+str(num)+".png")
 
         # Moving Average
-
         generated_images = self.GAN.GMA.predict(n1 + [n2, trunc], batch_size = BATCH_SIZE)
         #generated_images = self.generateTruncated(n1, trunc = trunc)
 
         r = []
-
         for i in range(0, 64, 8):
             r.append(np.concatenate(generated_images[i:i+8], axis = 1))
 
         c1 = np.concatenate(r, axis = 0)
         c1 = np.clip(c1, 0.0, 1.0)
-
         x = Image.fromarray(np.uint8(c1*255))
-
         x.save("Results/i"+str(num)+"-ema.png")
 
         #Mixing Regularities
@@ -532,24 +477,19 @@ class StyleGAN(object):
         p2 = [n2] * (n_layers - tt)
 
         latent = p1 + [] + p2
-
         generated_images = self.GAN.GMA.predict(latent + [nImage(64), trunc], batch_size = BATCH_SIZE)
         #generated_images = self.generateTruncated(latent, trunc = trunc)
 
         r = []
-
         for i in range(0, 64, 8):
             r.append(np.concatenate(generated_images[i:i+8], axis = 0))
 
         c1 = np.concatenate(r, axis = 1)
         c1 = np.clip(c1, 0.0, 1.0)
-
         x = Image.fromarray(np.uint8(c1*255))
-
         x.save("Results/i"+str(num)+"-mr.png")
 
     def generateTruncated(self, style, noi = np.zeros([44]), trunc = 0.5, outImage = False, num = 0):
-
         #Get W's center of mass
         if self.av.shape[0] == 44: #44 is an arbitrary value
             print("Approximating W center of mass")
@@ -570,65 +510,46 @@ class StyleGAN(object):
 
         if outImage:
             r = []
-
             for i in range(0, 64, 8):
                 r.append(np.concatenate(generated_images[i:i+8], axis = 0))
 
             c1 = np.concatenate(r, axis = 1)
             c1 = np.clip(c1, 0.0, 1.0)
-
             x = Image.fromarray(np.uint8(c1*255))
-
             x.save("Results/t"+str(num)+".png")
-
         return generated_images
 
     def saveModel(self, model, name, num):
         json = model.to_json()
         with open("Models/"+name+".json", "w") as json_file:
             json_file.write(json)
-
         model.save_weights("Models/"+name+"_"+str(num)+".h5")
 
     def loadModel(self, name, num):
-
-        file = open("Models/"+name+".json", 'r')
-        json = file.read()
-        file.close()
+        with open("Models/"+name+".json", 'r') as file:
+            json = file.read()
 
         mod = model_from_json(json, custom_objects = {'Conv2DMod': Conv2DMod})
         mod.load_weights("Models/"+name+"_"+str(num)+".h5")
-
         return mod
 
     def save(self, num): #Save JSON and Weights into /Models/
         self.saveModel(self.GAN.S, "sty", num)
         self.saveModel(self.GAN.G, "gen", num)
         self.saveModel(self.GAN.D, "dis", num)
-
         self.saveModel(self.GAN.GE, "genMA", num)
         self.saveModel(self.GAN.SE, "styMA", num)
 
 
     def load(self, num): #Load JSON and Weights from /Models/
-
         #Load Models
         self.GAN.D = self.loadModel("dis", num)
         self.GAN.S = self.loadModel("sty", num)
         self.GAN.G = self.loadModel("gen", num)
-
         self.GAN.GE = self.loadModel("genMA", num)
         self.GAN.SE = self.loadModel("styMA", num)
-
         self.GAN.GenModel()
         self.GAN.GenModelA()
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
