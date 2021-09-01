@@ -19,7 +19,7 @@ from conv_mod import *
 im_size = 64
 latent_size = 512
 BATCH_SIZE = 6
-directory = "Pokemon2"
+directory = "mars"
 
 cha = 12
 
