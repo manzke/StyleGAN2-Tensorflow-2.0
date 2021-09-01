@@ -20,12 +20,6 @@ Trained on Landscapes for 3.48 million images (290k steps, batch size 12, channe
 *To clarify, 3.48 million images were shown to the Discriminator, but the dataset consists of only ~14k images.
 Thus, of those 3.48 million images, most are repeats of already seen images.*
 
-![Teaser image](./landscapes3.png)
-
-
-Mixing Styles:
-
-![Teaser image](./styles3.png)
 
 
 
@@ -37,6 +31,3 @@ Please ensure you have created the following folders:
 
 Additionally, please ensure that your folder with images is in /data/ and changed at the top of stylegan.py.
 
-For **pretrained models**, download the pretrained models from [here](https://drive.google.com/drive/folders/1jE0lIJxgaHS7EE6mzm_ftl0ZcaY6olqI?usp=sharing)
-
-Then, adjust the main code at the bottom to use model.load(*model_num*), where *model_num* = the number from the downloaded model.
