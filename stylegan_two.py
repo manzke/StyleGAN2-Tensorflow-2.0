@@ -2,21 +2,16 @@ from PIL import Image
 from math import floor, log2
 import numpy as np
 import time
-from functools import partial
 from random import random
-import os
+import pathlib
 
 from tensorflow.keras.layers import *
 from tensorflow.keras.models import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.initializers import *
-import tensorflow as tf
-import tensorflow.keras.backend as K
 
 from datagen import DataGenerator, printProgressBar
 from conv_mod import *
-
-directory = "mars"
 
 
 # Loss functions
@@ -49,73 +44,14 @@ def crop_to_fit(x):
 def upsample(x):
     return K.resize_images(x, 2, 2, "channels_last", interpolation='bilinear')
 
-
-def make_uts(s1=4, s2=im_size):
-    ss = int(s2 / s1)
-
-    def upsample_to_size(x, y=ss):
-        x = K.resize_images(x, y, y, "channels_last", interpolation='bilinear')
-        return x
-
-    return upsample_to_size
-
-
-# Blocks
-def g_block(inp, istyle, inoise, fil, u=True):
-    if u:
-        # Custom upsampling because of clone_model issue
-        out = UpSampling2D(interpolation='bilinear')(inp)
-    else:
-        out = Activation('linear')(inp)
-
-    rgb_style = Dense(fil, kernel_initializer=VarianceScaling(200 / out.shape[2]))(istyle)
-    style = Dense(inp.shape[-1], kernel_initializer='he_uniform')(istyle)
-    delta = Lambda(crop_to_fit)([inoise, out])
-    d = Dense(fil, kernel_initializer='zeros')(delta)
-
-    out = Conv2DMod(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')([out, style])
-    out = add([out, d])
-    out = LeakyReLU(0.2)(out)
-
-    style = Dense(fil, kernel_initializer='he_uniform')(istyle)
-    d = Dense(fil, kernel_initializer='zeros')(delta)
-
-    out = Conv2DMod(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')([out, style])
-    out = add([out, d])
-    out = LeakyReLU(0.2)(out)
-
-    return out, to_rgb(out, rgb_style)
-
-
-def d_block(inp, fil, p=True):
-    res = Conv2D(fil, 1, kernel_initializer='he_uniform')(inp)
-
-    out = Conv2D(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')(inp)
-    out = LeakyReLU(0.2)(out)
-    out = Conv2D(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')(out)
-    out = LeakyReLU(0.2)(out)
-
-    out = add([res, out])
-
-    if p:
-        out = AveragePooling2D()(out)
-
-    return out
-
-
-def to_rgb(inp, style):
-    size = inp.shape[2]
-    x = Conv2DMod(3, 1, kernel_initializer=VarianceScaling(200 / size), demod=False)([inp, style])
-    return Lambda(make_uts(size, im_size), output_shape=[None, im_size, im_size, None])(x)
-
-
-def from_rgb(inp, conc=None):
-    fil = int(im_size * 4 / inp.shape[2])
-    z = AveragePooling2D()(inp)
-    x = Conv2D(fil, 1, kernel_initializer='he_uniform')(z)
-    if conc is not None:
-        x = concatenate([x, conc])
-    return x, z
+#
+# def from_rgb(inp, conc=None):
+#     fil = int(im_size * 4 / inp.shape[2])
+#     z = AveragePooling2D()(inp)
+#     x = Conv2D(fil, 1, kernel_initializer='he_uniform')(z)
+#     if conc is not None:
+#         x = concatenate([x, conc])
+#     return x, z
 
 
 class GAN(object):
@@ -124,6 +60,8 @@ class GAN(object):
 
         self.latent_size = latent_size
         self.img_size = img_size
+
+        self.n_layers = int(log2(self.img_size) - 1)
 
         self.cha = cha
 
@@ -156,6 +94,61 @@ class GAN(object):
         self.SE = clone_model(self.S)
         self.SE.set_weights(self.S.get_weights())
 
+    def make_uts(self, s1=4, s2=64):
+        ss = int(s2 / s1)
+
+        def upsample_to_size(x, y=ss):
+            x = K.resize_images(x, y, y, "channels_last", interpolation='bilinear')
+            return x
+
+        return upsample_to_size
+
+    def to_rgb(self, inp, style):
+        size = inp.shape[2]
+        x = Conv2DMod(3, 1, kernel_initializer=VarianceScaling(200 / size), demod=False)([inp, style])
+        return Lambda(self.make_uts(size, self.img_size), output_shape=[None, self.img_size, self.img_size, None])(x)
+
+    # Blocks
+    def g_block(self, inp, istyle, inoise, fil, u=True):
+        if u:
+            # Custom upsampling because of clone_model issue
+            out = UpSampling2D(interpolation='bilinear')(inp)
+        else:
+            out = Activation('linear')(inp)
+
+        rgb_style = Dense(fil, kernel_initializer=VarianceScaling(200 / out.shape[2]))(istyle)
+        style = Dense(inp.shape[-1], kernel_initializer='he_uniform')(istyle)
+        delta = Lambda(crop_to_fit)([inoise, out])
+        d = Dense(fil, kernel_initializer='zeros')(delta)
+
+        out = Conv2DMod(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')([out, style])
+        out = add([out, d])
+        out = LeakyReLU(0.2)(out)
+
+        style = Dense(fil, kernel_initializer='he_uniform')(istyle)
+        d = Dense(fil, kernel_initializer='zeros')(delta)
+
+        out = Conv2DMod(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')([out, style])
+        out = add([out, d])
+        out = LeakyReLU(0.2)(out)
+
+        return out, self.to_rgb(out, rgb_style)
+
+    def d_block(self, inp, fil, p=True):
+        res = Conv2D(fil, 1, kernel_initializer='he_uniform')(inp)
+
+        out = Conv2D(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')(inp)
+        out = LeakyReLU(0.2)(out)
+        out = Conv2D(filters=fil, kernel_size=3, padding='same', kernel_initializer='he_uniform')(out)
+        out = LeakyReLU(0.2)(out)
+
+        out = add([res, out])
+
+        if p:
+            out = AveragePooling2D()(out)
+
+        return out
+
     def discriminator(self):
 
         if self.D:
@@ -163,15 +156,15 @@ class GAN(object):
 
         inp = Input(shape=[self.img_size, self.img_size, 3])
 
-        x = d_block(inp, 1 * self.cha)  # 128
+        x = self.d_block(inp, 1 * self.cha)  # 128
 
-        x = d_block(x, 2 * self.cha)  # 64
+        x = self.d_block(x, 2 * self.cha)  # 64
 
-        x = d_block(x, 4 * self.cha)  # 32
+        x = self.d_block(x, 4 * self.cha)  # 32
 
-        x = d_block(x, 8 * self.cha)  # 16
+        x = self.d_block(x, 8 * self.cha)  # 16
 
-        x = d_block(x, 16 * self.cha, p=False)  # 8
+        x = self.d_block(x, 16 * self.cha, p=False)  # 8
 
         # x = d_block(x, 16 * self.cha)  #4
 
@@ -194,7 +187,7 @@ class GAN(object):
 
         self.S = Sequential()
 
-        self.S.add(Dense(512, input_shape=[LATENT_SIZE]))
+        self.S.add(Dense(512, input_shape=[self.latent_size]))
         self.S.add(LeakyReLU(0.2))
         self.S.add(Dense(512))
         self.S.add(LeakyReLU(0.2))
@@ -208,7 +201,7 @@ class GAN(object):
         # Inputs
         inp_style = []
 
-        for i in range(n_layers):
+        for i in range(self.n_layers):
             inp_style.append(Input([512]))
 
         inp_noise = Input([self.img_size, self.img_size, 1])
@@ -222,25 +215,25 @@ class GAN(object):
         x = Dense(4 * 4 * 4 * self.cha, activation='relu', kernel_initializer='random_normal')(x)
         x = Reshape([4, 4, 4 * self.cha])(x)
 
-        x, r = g_block(x, inp_style[0], inp_noise, 32 * self.cha, u=False)  # 4
+        x, r = self.g_block(x, inp_style[0], inp_noise, 32 * self.cha, u=False)  # 4
         outs.append(r)
 
         # x, r = g_block(x, inp_style[1], inp_noise, 16 * self.cha)  #8
         # outs.append(r)
 
-        x, r = g_block(x, inp_style[1], inp_noise, 8 * self.cha)  # 16
+        x, r = self.g_block(x, inp_style[1], inp_noise, 8 * self.cha)  # 16
         outs.append(r)
 
         # x, r = g_block(x, inp_style[3], inp_noise, 6 * self.cha)  #32
         # outs.append(r)
 
-        x, r = g_block(x, inp_style[2], inp_noise, 4 * self.cha)  # 64
+        x, r = self.g_block(x, inp_style[2], inp_noise, 4 * self.cha)  # 64
         outs.append(r)
 
-        x, r = g_block(x, inp_style[3], inp_noise, 2 * self.cha)  # 128
+        x, r = self.g_block(x, inp_style[3], inp_noise, 2 * self.cha)  # 128
         outs.append(r)
 
-        x, r = g_block(x, inp_style[4], inp_noise, 1 * self.cha)  # 256
+        x, r = self.g_block(x, inp_style[4], inp_noise, 1 * self.cha)  # 256
         outs.append(r)
 
         x = add(outs)
@@ -259,8 +252,8 @@ class GAN(object):
         inp_style = []
         style = []
 
-        for i in range(n_layers):
-            inp_style.append(Input([LATENT_SIZE]))
+        for i in range(self.n_layers):
+            inp_style.append(Input([self.latent_size]))
             style.append(self.S(inp_style[-1]))
 
         inp_noise = Input([self.img_size, self.img_size, 1])
@@ -278,8 +271,8 @@ class GAN(object):
         inp_style = []
         style = []
 
-        for i in range(n_layers):
-            inp_style.append(Input([LATENT_SIZE]))
+        for i in range(self.n_layers):
+            inp_style.append(Input([self.latent_size]))
             style.append(self.SE(inp_style[-1]))
 
         inp_noise = Input([self.img_size, self.img_size, 1])
@@ -318,8 +311,10 @@ class GAN(object):
 
 class StyleGAN(object):
 
-    def __init__(self, steps=1, lr=0.0001, decay=0.00001, silent=True, latent_size=512, img_size=128, batch_size=6):
+    def __init__(self, directory, save_directory, steps=1, lr=0.0001, decay=0.00001, silent=True, latent_size=512, img_size=128, batch_size=6):
 
+        self.directory = directory
+        self.save_directory = save_directory
         self.latent_size = latent_size
         self.img_size = img_size
 
@@ -337,7 +332,7 @@ class StyleGAN(object):
         self.GAN.G.summary()
 
         # Data generator (my own code, not from TF 2.0)
-        self.im = DataGenerator(directory, self.img_size, flip=True)
+        self.im = None
 
         # Set up variables
         self.lastblip = time.clock()
@@ -369,6 +364,7 @@ class StyleGAN(object):
         return p1 + [] + p2
 
     def train(self):
+        self.im = DataGenerator(self.directory, self.img_size, flip=True)
 
         # Train Alternating
         if random() < self.mixed_prob:
@@ -496,9 +492,9 @@ class StyleGAN(object):
     def evaluate(self, num=0):
 
         n1 = self.noise_list(64)
-        n2 = self.n_image(64, self.img_size)
+        n2 = self.n_image(64)
 
-        generated_images = self.GAN.GM.predict(n1 + [n2], batch_size=BATCH_SIZE)
+        generated_images = self.GAN.GM.predict(n1 + [n2], batch_size=self.batch_size)
 
         r = []
         for i in range(0, 64, 8): r.append(np.concatenate(generated_images[i:i + 8], axis=1))
@@ -511,7 +507,7 @@ class StyleGAN(object):
 
         # Moving Average
 
-        generated_images = self.GAN.GMA.predict(n1 + [n2], batch_size=BATCH_SIZE)
+        generated_images = self.GAN.GMA.predict(n1 + [n2], batch_size=self.batch_size)
 
         r = []
         for i in range(0, 64, 8): r.append(np.concatenate(generated_images[i:i + 8], axis=1))
@@ -534,7 +530,7 @@ class StyleGAN(object):
 
         latent = p1 + [] + p2
 
-        generated_images = self.GAN.GMA.predict(latent + [self.n_image(64, self.img_size)], batch_size=BATCH_SIZE)
+        generated_images = self.GAN.GMA.predict(latent + [self.n_image(64)], batch_size=self.batch_size)
 
         r = []
         for i in range(0, 64, 8): r.append(np.concatenate(generated_images[i:i + 8], axis=0))
@@ -555,7 +551,7 @@ class StyleGAN(object):
             self.av = np.expand_dims(self.av, axis=0)
 
         if noi.shape[0] == 44:
-            noi = self.n_image(64, self.img_size)
+            noi = self.n_image(64)
 
         w_space = []
         for i in range(len(style)):
@@ -563,7 +559,7 @@ class StyleGAN(object):
             tempStyle = trunc * (tempStyle - self.av) + self.av
             w_space.append(tempStyle)
 
-        generated_images = self.GAN.GE.predict(w_space + [noi], batch_size=BATCH_SIZE)
+        generated_images = self.GAN.GE.predict(w_space + [noi], batch_size=self.batch_size)
 
         if outImage:
             r = []
@@ -620,7 +616,7 @@ class StyleGAN(object):
 
 
 if __name__ == "__main__":
-    model = StyleGAN(lr=0.0001, silent=False, latent_size=512, img_size=128)
+    model = StyleGAN(directory='mars', lr=0.0001, silent=False, latent_size=512, img_size=128)
     model.GAN.steps = 1
 
     while model.GAN.steps < 1000001:
