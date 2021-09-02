@@ -26,13 +26,8 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
         print()
 
 
-
-
-
-
-class dataGenerator(object):
-
-    def __init__(self, folder, im_size, mss = (1024 ** 3), flip = True, verbose = True):
+class DataGenerator(object):
+    def __init__(self, folder, im_size, mss=(1024 ** 3), flip=True, verbose=True):
         self.folder = folder
         self.im_size = im_size
         self.segment_length = mss // (im_size * im_size * 3)
@@ -73,8 +68,6 @@ class dataGenerator(object):
         if self.verbose:
             print(str(len(names)) + " images.")
 
-
-
         kn = 0
         sn = 0
 
@@ -98,7 +91,6 @@ class dataGenerator(object):
                 segment = []
                 kn = 0
                 sn = sn + 1
-
 
         np.save("data/" + folder + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
 
