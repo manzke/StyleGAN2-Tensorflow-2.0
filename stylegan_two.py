@@ -314,7 +314,14 @@ class StyleGAN(object):
     def __init__(self, directory, save_directory, steps=1, lr=0.0001, decay=0.00001, silent=True, latent_size=512, img_size=128, batch_size=6):
 
         self.directory = directory
-        self.save_directory = save_directory
+        self.save_directory = pathlib.Path(save_directory)
+
+        self.results_path = self.save_directory / 'results'
+        self.results_path.mkdir(parents=True, exist_ok=True)
+
+        self.models_path = self.save_directory / 'models'
+        self.model_path.mkdir(parents=True, exist_ok=True)
+
         self.latent_size = latent_size
         self.img_size = img_size
 
@@ -503,7 +510,7 @@ class StyleGAN(object):
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save("Results/i" + str(num) + ".png")
+        x.save(self.results_path / f'i{str(num)}.png')
 
         # Moving Average
 
@@ -517,7 +524,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save("Results/i" + str(num) + "-ema.png")
+        x.save(self.results_path / f'i{str(num)}-ema.png')
 
         # Mixing Regularities
         nn = self.noise(8)
@@ -540,7 +547,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save("Results/i" + str(num) + "-mr.png")
+        x.save(self.results_path / f'i{str(num)}-mr.png')
 
     def generate_truncated(self, style, noi=np.zeros([44]), trunc=0.5, outImage=False, num=0):
 
@@ -572,25 +579,25 @@ class StyleGAN(object):
 
             x = Image.fromarray(np.uint8(c1 * 255))
 
-            x.save("Results/t" + str(num) + ".png")
+            x.save(self.results_path / f't{str(num)}.png')
 
         return generated_images
 
     def save_model(self, model, name, num):
         json = model.to_json()
-        with open("Models/" + name + ".json", "w") as json_file:
+        with open(self.models_path / f'{name}.json', "w") as json_file:
             json_file.write(json)
 
-        model.save_weights("Models/" + name + "_" + str(num) + ".h5")
+        model.save_weights(self.models_path / f'{name}_{str(num)}.h5')
 
     def load_model(self, name, num):
 
-        file = open("Models/" + name + ".json", 'r')
+        file = open(self.models_path / f'{name}.json', 'r')
         json = file.read()
         file.close()
 
         mod = model_from_json(json, custom_objects={'Conv2DMod': Conv2DMod})
-        mod.load_weights("Models/" + name + "_" + str(num) + ".h5")
+        mod.load_weights(self.models_path / f'{name}_{str(num)}.h5')
 
         return mod
 
@@ -616,7 +623,7 @@ class StyleGAN(object):
 
 
 if __name__ == "__main__":
-    model = StyleGAN(directory='mars', lr=0.0001, silent=False, latent_size=512, img_size=128)
+    model = StyleGAN(directory='mars', save_directory='save', lr=0.0001, silent=False, latent_size=512, img_size=128)
     model.GAN.steps = 1
 
     while model.GAN.steps < 1000001:
