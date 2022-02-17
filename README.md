@@ -1,3 +1,8 @@
+Original Repo:
+Modifications from:
+- https://github.com/StuartFarmer
+- https://github.com/marmig0404
+
 # StyleGAN2 Tensorflow 2.0
 
 Unofficial implementation of StyleGAN 2 using TensorFlow 2.0. (Compatible with up to 2.5)
