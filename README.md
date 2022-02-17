@@ -1,4 +1,5 @@
 Original work: https://github.com/manicman1999/StyleGAN2-Tensorflow-2.0
+
 Pulled in changes from the forks to combine them into one and started rewriting it.
 
 Modifications from:
