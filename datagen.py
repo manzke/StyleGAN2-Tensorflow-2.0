@@ -27,10 +27,11 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
 
 
 class DataGenerator(object):
-    def __init__(self, folder, im_size, mss=(1024 ** 3), flip=True, verbose=True):
-        self.folder = folder
-        self.im_size = im_size
-        self.segment_length = mss // (im_size * im_size * 3)
+    def __init__(self, path, dataset, img_size, mss = (1024 ** 3), flip = True, verbose = True):
+        self.path = path
+        self.dataset = dataset
+        self.img_size = img_size
+        self.segment_length = mss // (img_size * img_size * 3)
         self.flip = flip
         self.verbose = verbose
 
@@ -39,26 +40,26 @@ class DataGenerator(object):
         self.update = 0
 
         if self.verbose:
-            print("Importing images...")
+            print("Importing images from ...{}/{}".format(path, dataset))
             print("Maximum Segment Size: ", self.segment_length)
 
-        try:
-            os.mkdir(self.folder + "-npy-" + str(self.im_size))
-        except:
-            self.load_from_npy(folder)
-            return
+        numpy_path = self.path + "/" + self.dataset + "-npy-" + str(self.img_size)
 
-        self.folder_to_npy(self.folder)
-        self.load_from_npy(self.folder)
+        if os.path.exists(numpy_path) and len(os.listdir(numpy_path)) > 0:
+            self.load_from_npy()
+        else:
+            os.makedirs(numpy_path, exist_ok = True)
+            self.folder_to_npy()
+            self.load_from_npy()
 
-    def folder_to_npy(self, folder):
+    def folder_to_npy(self):
 
         if self.verbose:
             print("Converting from images to numpy files...")
 
         names = []
 
-        for dirpath, dirnames, filenames in os.walk(folder):
+        for dirpath, dirnames, filenames in os.walk(self.path + "/" + self.dataset):
             for filename in [f for f in filenames if (f.endswith(".jpg") or f.endswith(".png") or f.endswith(".JPEG"))]:
                 fname = os.path.join(dirpath, filename)
                 names.append(fname)
@@ -78,7 +79,7 @@ class DataGenerator(object):
                 print('\r' + str(sn) + " // " + str(kn) + "\t", end = '\r')
 
             try:
-                temp = Image.open(fname).convert('RGB').resize((self.im_size, self.im_size), Image.BILINEAR)
+                temp = Image.open(fname).convert('RGB').resize((self.img_size, self.img_size), Image.BILINEAR)
             except:
                 print("Importing image failed on", fname)
             temp = np.array(temp, dtype='uint8')
@@ -86,18 +87,19 @@ class DataGenerator(object):
             kn = kn + 1
 
             if kn >= self.segment_length:
-                np.save(folder + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
+                np.save(self.path + "/" + self.dataset + "-npy-" + str(self.img_size) + "/data-"+str(sn)+".npy", np.array(segment))
 
                 segment = []
                 kn = 0
                 sn = sn + 1
 
-        np.save(folder + "-npy-" + str(self.im_size) + "/data-"+str(sn)+".npy", np.array(segment))
+
+        np.save(self.path + "/" + self.dataset + "-npy-" + str(self.img_size) + "/data-"+str(sn)+".npy", np.array(segment))
 
 
-    def load_from_npy(self, folder):
+    def load_from_npy(self):
 
-        for dirpath, dirnames, filenames in os.walk(folder + "-npy-" + str(self.im_size)):
+        for dirpath, dirnames, filenames in os.walk(self.path + "/" + self.dataset + "-npy-" + str(self.img_size)):
             for filename in [f for f in filenames if f.endswith(".npy")]:
                 self.segments.append(os.path.join(dirpath, filename))
 
@@ -117,7 +119,7 @@ class DataGenerator(object):
     def get_batch(self, num):
 
         if self.update > self.images.shape[0]:
-            self.load_from_npy(self.folder)
+            self.load_from_npy()
 
         self.update = self.update + num
 
@@ -130,5 +132,3 @@ class DataGenerator(object):
                 out[-1] = np.flip(out[-1], 1)
 
         return np.array(out).astype('float32') / 255.0
-
-
