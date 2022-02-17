@@ -44,15 +44,6 @@ def crop_to_fit(x):
 def upsample(x):
     return K.resize_images(x, 2, 2, "channels_last", interpolation='bilinear')
 
-#
-# def from_rgb(inp, conc=None):
-#     fil = int(im_size * 4 / inp.shape[2])
-#     z = AveragePooling2D()(inp)
-#     x = Conv2D(fil, 1, kernel_initializer='he_uniform')(z)
-#     if conc is not None:
-#         x = concatenate([x, conc])
-#     return x, z
-
 
 class GAN(object):
 
@@ -311,15 +302,17 @@ class GAN(object):
 
 class StyleGAN(object):
 
-    def __init__(self, directory, save_directory, steps=1, lr=0.0001, decay=0.00001, silent=True, latent_size=512, img_size=128, batch_size=6):
+    def __init__(self, dataset, data_path='Data', model_path='Models', results_path='Results', steps=1, max_steps = 25000, lr=0.0001, verbose=True, latent_size=512, img_size=256, batch_size=64):
+        self.dataset = dataset
 
-        self.directory = directory
-        self.save_directory = pathlib.Path(save_directory)
+        self.max_steps = max_steps
 
-        self.results_path = self.save_directory / 'results'
+        self.data_path = data_path
+        
+        self.results_path = pathlib.Path(results_path)
         self.results_path.mkdir(parents=True, exist_ok=True)
 
-        self.models_path = self.save_directory / 'models'
+        self.model_path = pathlib.Path(model_path)
         self.model_path.mkdir(parents=True, exist_ok=True)
 
         self.latent_size = latent_size
@@ -332,7 +325,7 @@ class StyleGAN(object):
         self.batch_size = batch_size
 
         # Init GAN and Eval Models
-        self.GAN = GAN(steps=steps, lr=lr, decay=decay, latent_size=512, img_size=128)
+        self.GAN = GAN(steps=steps, lr=lr, latent_size=latent_size, img_size=img_size)
         self.GAN.gen_model()
         self.GAN.gen_model_a()
 
@@ -342,9 +335,9 @@ class StyleGAN(object):
         self.im = None
 
         # Set up variables
-        self.lastblip = time.clock()
+        self.lastblip = time.time()
 
-        self.silent = silent
+        self.verbose = verbose
 
         self.ones = np.ones((self.batch_size, 1), dtype=np.float32)
         self.zeros = np.zeros((self.batch_size, 1), dtype=np.float32)
@@ -371,7 +364,8 @@ class StyleGAN(object):
         return p1 + [] + p2
 
     def train(self):
-        self.im = DataGenerator(self.directory, self.img_size, flip=True)
+        if self.im == None:
+            self.im = DataGenerator(self.data_path, self.dataset, self.img_size, flip = True, verbose = self.verbose)
 
         # Train Alternating
         if random() < self.mixed_prob:
@@ -407,15 +401,16 @@ class StyleGAN(object):
             print("NaN Value Error.")
             exit()
 
-        # Print info
-        if self.GAN.steps % 100 == 0 and not self.silent:
+
+        #Print info
+        if self.GAN.steps % 100 == 0 and self.verbose:
             print("\n\nRound " + str(self.GAN.steps) + ":")
             print("D:", np.array(a))
             print("G:", np.array(b))
             print("PL:", self.pl_mean)
 
-            s = round((time.clock() - self.lastblip), 4)
-            self.lastblip = time.clock()
+            s = round((time.time() - self.lastblip), 4)
+            self.lastblip = time.time()
 
             steps_per_second = 100 / s
             steps_per_minute = steps_per_second * 60
@@ -426,7 +421,7 @@ class StyleGAN(object):
             min1k = floor(1000 / steps_per_minute)
             sec1k = floor(1000 / steps_per_second) % 60
             print("1k Steps: " + str(min1k) + ":" + str(sec1k))
-            steps_left = 200000 - self.GAN.steps + 1e-7
+            steps_left = self.max_steps - self.GAN.steps + 1e-7
             hours_left = steps_left // steps_per_hour
             minutes_left = (steps_left // steps_per_minute) % 60
 
@@ -434,8 +429,9 @@ class StyleGAN(object):
             print()
 
             # Save Model
-            if self.GAN.steps % 500 == 0:
-                self.save(floor(self.GAN.steps / 10000))
+            if self.GAN.steps % 100 == 0:
+                self.save(floor(self.GAN.steps / 100))
+                self.evaluate(floor(self.GAN.steps / 100))
             if self.GAN.steps % 1000 == 0 or (self.GAN.steps % 100 == 0 and self.GAN.steps < 2500):
                 self.evaluate(floor(self.GAN.steps / 1000))
 
@@ -585,19 +581,18 @@ class StyleGAN(object):
 
     def save_model(self, model, name, num):
         json = model.to_json()
-        with open(self.models_path / f'{name}.json', "w") as json_file:
+        with open(self.model_path / f'{name}.json', "w") as json_file:
             json_file.write(json)
 
-        model.save_weights(self.models_path / f'{name}_{str(num)}.h5')
+        model.save_weights(self.model_path / f'{name}_{str(num)}.h5')
 
     def load_model(self, name, num):
-
-        file = open(self.models_path / f'{name}.json', 'r')
+        file = open(self.model_path / f'{name}.json', 'r')
         json = file.read()
         file.close()
 
         mod = model_from_json(json, custom_objects={'Conv2DMod': Conv2DMod})
-        mod.load_weights(self.models_path / f'{name}_{str(num)}.h5')
+        mod.load_weights(self.model_path / f'{name}_{str(num)}.h5')
 
         return mod
 
@@ -623,8 +618,8 @@ class StyleGAN(object):
 
 
 if __name__ == "__main__":
-    model = StyleGAN(directory='mars', save_directory='save', lr=0.0001, silent=False, latent_size=512, img_size=128)
+    model = StyleGAN(dataset='dresses', lr=0.002, verbose=True, latent_size=512, img_size=256)
     model.GAN.steps = 1
 
-    while model.GAN.steps < 1000001:
+    while model.GAN.steps <= model.max_steps:
         model.train()
