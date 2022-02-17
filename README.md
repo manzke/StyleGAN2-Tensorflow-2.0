@@ -1,7 +1,13 @@
-Original Repo:
+Original work: https://github.com/manicman1999/StyleGAN2-Tensorflow-2.0
+Pulled in changes from the forks to combine them into one and started rewriting it.
+
 Modifications from:
 - https://github.com/StuartFarmer
 - https://github.com/marmig0404
+- https://github.com/jimmiebtlr
+- https://github.com/Fofeu
+- https://github.com/robgon-art
+- https://github.com/leoHeidel
 
 # StyleGAN2 Tensorflow 2.0
 
