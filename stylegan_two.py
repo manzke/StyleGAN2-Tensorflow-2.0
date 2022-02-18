@@ -9,10 +9,13 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.models import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.initializers import *
+from tensorflow.keras.losses import BinaryCrossentropy
 
 from datagen import DataGenerator, printProgressBar
 from conv_mod import *
 
+#feature flag
+use_bce_loss = False
 
 # Loss functions
 def gradient_penalty(samples, output, weight):
@@ -22,12 +25,10 @@ def gradient_penalty(samples, output, weight):
 
     # (weight / 2) * ||grad||^2
     # Penalize the gradient norm
-    return K.mean(_gradient_penalty) * weight
-
+    return K.mean(_gradient_penalty) * weight # from 0xtristan * 0.5
 
 def hinge_d(y_true, y_pred):
     return K.mean(K.relu(1.0 + (y_true * y_pred)))
-
 
 def w_loss(y_true, y_pred):
     return K.mean(y_true * y_pred)
@@ -42,7 +43,7 @@ def crop_to_fit(x):
 
 class GAN(object):
 
-    def __init__(self, steps=1, lr=0.0001, decay=0.00001, latent_size=512, img_size=128, cha=12):
+    def __init__(self, steps=1, lr=0.0001, latent_size=512, img_size=128, cha=12):
 
         self.latent_size = latent_size
         self.img_size = img_size
@@ -80,6 +81,10 @@ class GAN(object):
         self.SE = clone_model(self.S)
         self.SE.set_weights(self.S.get_weights())
 
+        # Losses
+        if use_bce_loss:
+            self.bce = BinaryCrossentropy(from_logits=True)
+
     def make_uts(self, s1=4, s2=64):
         ss = int(s2 / s1)
 
@@ -99,6 +104,7 @@ class GAN(object):
         if u:
             # Custom upsampling because of clone_model issue
             out = UpSampling2D(interpolation='bilinear')(inp)
+            #from 0xtristan out = Lambda(upsample, output_shape=[None, inp.shape[2] * 2, inp.shape[2] * 2, None])(inp)
         else:
             out = Activation('linear')(inp)
 
@@ -141,30 +147,18 @@ class GAN(object):
             return self.D
 
         inp = Input(shape=[self.img_size, self.img_size, 3])
-
-        x = self.d_block(inp, 1 * self.cha)  # 128
-
-        x = self.d_block(x, 2 * self.cha)  # 64
-
-        x = self.d_block(x, 4 * self.cha)  # 32
-
+        x = self.d_block(inp, 1 * self.cha)  # 256
+        x = self.d_block(x, 2 * self.cha)  # 128
+        x = self.d_block(x, 4 * self.cha)  # 64
+        x = self.d_block(x, 6 * self.cha)  # 32
         x = self.d_block(x, 8 * self.cha)  # 16
-
-        x = self.d_block(x, 16 * self.cha, p=False)  # 8
-
-        # x = d_block(x, 16 * self.cha)  #4
-
-        # x = d_block(x, 32 * self.cha, p = False)  #4
+        x = self.d_block(x, 16 * self.cha)  # 8
+        x = self.d_block(x, 32 * self.cha, p = False)  #4
 
         x = Flatten()(x)
-
         x = Dense(1, kernel_initializer='he_uniform')(x)
 
-<<<<<<< HEAD
-        self.D = Model(inputs=inp, outputs=x, name = "Descriminator")
-=======
         self.D = Model(inputs = inp, outputs = x, name = "Descriminator")
->>>>>>> robgon-art-master
 
         return self.D
 
@@ -174,9 +168,7 @@ class GAN(object):
             return self.G
 
         # === Style Mapping ===
-
         self.S = Sequential(name = "Style")
-
         self.S.add(Dense(512, input_shape=[self.latent_size]))
         self.S.add(LeakyReLU(0.2))
         self.S.add(Dense(512))
@@ -201,10 +193,8 @@ class GAN(object):
 
         # Inputs
         inp_style = []
-
         for i in range(self.n_layers):
             inp_style.append(Input([512]))
-
         inp_noise = Input([self.img_size, self.img_size, 1])
 
         # Latent
@@ -215,38 +205,25 @@ class GAN(object):
         # Actual Model
         x = Dense(4 * 4 * 4 * self.cha, activation='relu', kernel_initializer='random_normal')(x)
         x = Reshape([4, 4, 4 * self.cha])(x)
-
         x, r = self.g_block(x, inp_style[0], inp_noise, 32 * self.cha, u=False)  # 4
         outs.append(r)
-
-        # x, r = g_block(x, inp_style[1], inp_noise, 16 * self.cha)  #8
-        # outs.append(r)
-
-        x, r = self.g_block(x, inp_style[1], inp_noise, 8 * self.cha)  # 16
+        x, r = self.g_block(x, inp_style[1], inp_noise, 16 * self.cha)  # 8
         outs.append(r)
-
-        # x, r = g_block(x, inp_style[3], inp_noise, 6 * self.cha)  #32
-        # outs.append(r)
-
-        x, r = self.g_block(x, inp_style[2], inp_noise, 4 * self.cha)  # 64
+        x, r = self.g_block(x, inp_style[2], inp_noise, 8 * self.cha)  # 16
         outs.append(r)
-
-        x, r = self.g_block(x, inp_style[3], inp_noise, 2 * self.cha)  # 128
+        x, r = self.g_block(x, inp_style[3], inp_noise, 6 * self.cha)  # 32
         outs.append(r)
-
-        x, r = self.g_block(x, inp_style[4], inp_noise, 1 * self.cha)  # 256
+        x, r = self.g_block(x, inp_style[4], inp_noise, 4 * self.cha)  # 64
+        outs.append(r)
+        x, r = self.g_block(x, inp_style[5], inp_noise, 2 * self.cha)  # 128
+        outs.append(r)
+        x, r = self.g_block(x, inp_style[6], inp_noise, 1 * self.cha)  # 256
         outs.append(r)
 
         x = add(outs)
+        x = Lambda(lambda y: y / 2 + 0.5)(x)  # Use values centered around 0, but normalize to [0, 1], providing better initialization
 
-        x = Lambda(lambda y: y / 2 + 0.5)(
-            x)  # Use values centered around 0, but normalize to [0, 1], providing better initialization
-
-<<<<<<< HEAD
-        self.G = Model(inputs=inp_style + [inp_noise], outputs=x, name = "Generator")
-=======
         self.G = Model(inputs = inp_style + [inp_noise], outputs = x, name="Generator")
->>>>>>> robgon-art-master
 
         return self.G, self.S
 
@@ -417,7 +394,6 @@ class StyleGAN(object):
             print("NaN Value Error.")
             exit()
 
-
         #Print info
         if self.GAN.steps % 100 == 0 and self.verbose:
             print("\n\nRound " + str(self.GAN.steps) + ":")
@@ -445,15 +421,9 @@ class StyleGAN(object):
             print()
 
             # Save Model
-<<<<<<< HEAD
             if self.GAN.steps % 100 == 0:
                 self.save(floor(self.GAN.steps / 100))
                 self.evaluate(floor(self.GAN.steps / 100))
-=======
-            if self.GAN.steps % 1000 == 0:
-                self.save(floor(self.GAN.steps / 1000))
-                self.evaluate(floor(self.GAN.steps / 1000))
->>>>>>> robgon-art-master
 
         printProgressBar(self.GAN.steps % 100, 99, decimals=0)
 
@@ -461,7 +431,6 @@ class StyleGAN(object):
 
     @tf.function
     def train_step(self, images, style, noise, perform_gp=True, perform_pl=False):
-
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             # Get style information
             w_space = []
@@ -477,8 +446,16 @@ class StyleGAN(object):
             fake_output = self.GAN.D(generated_images, training=True)
 
             # Hinge loss function
-            gen_loss = K.mean(fake_output)
-            divergence = K.mean(K.relu(1 + real_output) + K.relu(1 - fake_output))
+            if use_bce_loss:
+                gen_loss = self.bce(tf.ones_like(fake_output), fake_output) # Logistic NS
+                real_disc_loss = self.bce(tf.ones_like(real_output), real_output)
+                fake_disc_loss = self.bce(tf.zeros_like(fake_output), fake_output)
+                divergence = real_disc_loss + fake_disc_loss # -log(1-sigmoid(fake_scores_out)) -log(sigmoid(real_scores_out))
+            else:
+                #orig
+                gen_loss = K.mean(fake_output)
+                divergence = K.mean(K.relu(1 + real_output) + K.relu(1 - fake_output))
+
             disc_loss = divergence
 
             if perform_gp:
@@ -639,14 +616,11 @@ class StyleGAN(object):
 
 if __name__ == "__main__":
     model = StyleGAN(dataset='dresses', lr=0.002, verbose=True, latent_size=512, img_size=256)
-    model.GAN.steps = 201
+    model.GAN.steps = 100
     #check resuming and specifying the right steps
-    model.load(2)
+    model.load(1)
 
     while model.GAN.steps <= model.max_steps:
-<<<<<<< HEAD
-        model.train()
-=======
         model.train()
 
     """
@@ -657,4 +631,3 @@ if __name__ == "__main__":
         print(i, end = '\r')
         model.generateTruncated(n1, noi = n2, trunc = i / 50, outImage = True, num = i)
     """
->>>>>>> robgon-art-master

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Models
 Results
 Data
@@ -5,3 +6,6 @@ __pycache__
 plot.png
 .idea
 .DS_Store
+=======
+data/*.h5
+>>>>>>> 29743e1a7c36e3ea586f50653181dea004027e0a
