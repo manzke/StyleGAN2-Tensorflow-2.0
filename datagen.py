@@ -1,7 +1,7 @@
-from PIL import Image
+import tensorflow as tf
 import numpy as np
-import random
 import os
+import random
 
 # Print iterations progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 50, fill = '█'):
@@ -34,7 +34,6 @@ class DataGenerator(object):
         self.segment_length = mss // (img_size * img_size * 3)
         self.flip = flip
         self.verbose = verbose
-
         self.segments = []
         self.images = []
         self.update = 0
@@ -93,9 +92,7 @@ class DataGenerator(object):
                 kn = 0
                 sn = sn + 1
 
-
         np.save(self.path + "/" + self.dataset + "-npy-" + str(self.img_size) + "/data-"+str(sn)+".npy", np.array(segment))
-
 
     def load_from_npy(self):
 
