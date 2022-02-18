@@ -328,6 +328,7 @@ class StyleGAN(object):
         self.im = None
 
         # Set up variables
+        self.startblip = time.time()
         self.lastblip = time.time()
 
         self.verbose = verbose
@@ -401,6 +402,9 @@ class StyleGAN(object):
             print("G:", np.array(b))
             print("PL:", self.pl_mean)
 
+            time_since_start = round((time.time() - self.startblip), 4)
+            print("Time since start: " + str(time_since_start) // 60)
+
             s = round((time.time() - self.lastblip), 4)
             self.lastblip = time.time()
 
@@ -412,12 +416,13 @@ class StyleGAN(object):
 
             min1k = floor(1000 / steps_per_minute)
             sec1k = floor(1000 / steps_per_second) % 60
-            print("1k Steps: " + str(min1k) + ":" + str(sec1k))
+            print("1k Steps: " + str(min1k).zfill(2) + "m" + str(sec1k).zfill(2) + "s")
+            
             steps_left = self.max_steps - self.GAN.steps + 1e-7
             hours_left = steps_left // steps_per_hour
             minutes_left = (steps_left // steps_per_minute) % 60
 
-            print("Til Completion: " + str(int(hours_left)) + "h" + str(int(minutes_left)) + "m")
+            print("Til Completion: " + str(int(hours_left)).zfill(2) + "h" + str(int(minutes_left)).zfill(2) + "m")
             print()
 
             # Save Model
