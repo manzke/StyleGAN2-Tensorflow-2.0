@@ -16,6 +16,8 @@ from conv_mod import *
 
 #feature flag
 use_bce_loss = False
+num_style_layers = 4
+snap = 100
 
 # Loss functions
 def gradient_penalty(samples, output, weight):
@@ -25,7 +27,7 @@ def gradient_penalty(samples, output, weight):
 
     # (weight / 2) * ||grad||^2
     # Penalize the gradient norm
-    return K.mean(_gradient_penalty) * weight # from 0xtristan * 0.5
+    return K.mean(_gradient_penalty) * weight * 0.5 #originally manicman was with out * 0.5
 
 def hinge_d(y_true, y_pred):
     return K.mean(K.relu(1.0 + (y_true * y_pred)))
@@ -66,14 +68,14 @@ class GAN(object):
         # Config
         self.LR = lr
         self.steps = steps
-        self.beta = 0.999
+        self.beta = 0.99
 
         # Init Models
         self.discriminator()
         self.generator()
 
-        self.GMO = Adam(lr=self.LR, beta_1=0, beta_2=0.999)
-        self.DMO = Adam(lr=self.LR, beta_1=0, beta_2=0.999)
+        self.GMO = Adam(learning_rate=self.LR, beta_1=0, beta_2=self.beta)
+        self.DMO = Adam(learning_rate=self.LR, beta_1=0, beta_2=self.beta)
 
         self.GE = clone_model(self.G)
         self.GE.set_weights(self.G.get_weights())
@@ -171,23 +173,10 @@ class GAN(object):
         self.S = Sequential(name = "Style")
         self.S.add(Dense(512, input_shape=[self.latent_size]))
         self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-
-        ''' TODO from LeoHeidel / robgon-art branch
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        self.S.add(Dense(512))
-        self.S.add(LeakyReLU(0.2))
-        '''
+        for layers in range(1, num_style_layers):
+            print("adding another style mapping layer #{}".format(layers + 1))
+            self.S.add(Dense(512))
+            self.S.add(LeakyReLU(0.2))
 
         # === Generator ===
 
@@ -403,7 +392,7 @@ class StyleGAN(object):
             print("PL:", self.pl_mean)
 
             time_since_start = round((time.time() - self.startblip), 4)
-            print("Time since start: " + str(time_since_start) // 60)
+            print("Time since start: " + str(time_since_start // 60))
 
             s = round((time.time() - self.lastblip), 4)
             self.lastblip = time.time()
@@ -417,7 +406,7 @@ class StyleGAN(object):
             min1k = floor(1000 / steps_per_minute)
             sec1k = floor(1000 / steps_per_second) % 60
             print("1k Steps: " + str(min1k).zfill(2) + "m" + str(sec1k).zfill(2) + "s")
-            
+
             steps_left = self.max_steps - self.GAN.steps + 1e-7
             hours_left = steps_left // steps_per_hour
             minutes_left = (steps_left // steps_per_minute) % 60
@@ -426,7 +415,7 @@ class StyleGAN(object):
             print()
 
             # Save Model
-            if self.GAN.steps % 100 == 0:
+            if self.GAN.steps % snap == 0:
                 self.save(floor(self.GAN.steps / 100))
                 self.evaluate(floor(self.GAN.steps / 100))
 
@@ -621,9 +610,9 @@ class StyleGAN(object):
 
 if __name__ == "__main__":
     model = StyleGAN(dataset='dresses', lr=0.002, verbose=True, latent_size=512, img_size=256)
-    model.GAN.steps = 100
+    model.GAN.steps = 1701
     #check resuming and specifying the right steps
-    model.load(1)
+    model.load(17)
 
     while model.GAN.steps <= model.max_steps:
         model.train()
