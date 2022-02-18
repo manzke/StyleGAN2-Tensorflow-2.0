@@ -165,7 +165,7 @@ class GAN(object):
 
         x = Dense(1, kernel_initializer='he_uniform')(x)
 
-        self.D = Model(inputs=inp, outputs=x)
+        self.D = Model(inputs=inp, outputs=x, name = "Descriminator")
 
         return self.D
 
@@ -176,7 +176,7 @@ class GAN(object):
 
         # === Style Mapping ===
 
-        self.S = Sequential()
+        self.S = Sequential(name = "Style")
 
         self.S.add(Dense(512, input_shape=[self.latent_size]))
         self.S.add(LeakyReLU(0.2))
@@ -186,6 +186,17 @@ class GAN(object):
         self.S.add(LeakyReLU(0.2))
         self.S.add(Dense(512))
         self.S.add(LeakyReLU(0.2))
+
+        ''' TODO from LeoHeidel / robgon-art branch
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        self.S.add(Dense(512))
+        self.S.add(LeakyReLU(0.2))
+        '''
 
         # === Generator ===
 
@@ -232,7 +243,7 @@ class GAN(object):
         x = Lambda(lambda y: y / 2 + 0.5)(
             x)  # Use values centered around 0, but normalize to [0, 1], providing better initialization
 
-        self.G = Model(inputs=inp_style + [inp_noise], outputs=x)
+        self.G = Model(inputs=inp_style + [inp_noise], outputs=x, name = "Generator")
 
         return self.G, self.S
 
@@ -329,7 +340,9 @@ class StyleGAN(object):
         self.GAN.gen_model()
         self.GAN.gen_model_a()
 
+        self.GAN.S.summary()
         self.GAN.G.summary()
+        self.GAN.D.summary()
 
         # Data generator (my own code, not from TF 2.0)
         self.im = None
@@ -432,8 +445,6 @@ class StyleGAN(object):
             if self.GAN.steps % 100 == 0:
                 self.save(floor(self.GAN.steps / 100))
                 self.evaluate(floor(self.GAN.steps / 100))
-            if self.GAN.steps % 1000 == 0 or (self.GAN.steps % 100 == 0 and self.GAN.steps < 2500):
-                self.evaluate(floor(self.GAN.steps / 1000))
 
         printProgressBar(self.GAN.steps % 100, 99, decimals=0)
 
@@ -506,7 +517,7 @@ class StyleGAN(object):
         c1 = np.clip(c1, 0.0, 1.0)
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save(self.results_path / f'i{str(num)}.png')
+        x.save(self.results_path / f'i{str(num).zfill(3)}.png')
 
         # Moving Average
 
@@ -520,7 +531,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save(self.results_path / f'i{str(num)}-ema.png')
+        x.save(self.results_path / f'i{str(num).zfill(3)}-ema.png')
 
         # Mixing Regularities
         nn = self.noise(8)
@@ -543,7 +554,7 @@ class StyleGAN(object):
 
         x = Image.fromarray(np.uint8(c1 * 255))
 
-        x.save(self.results_path / f'i{str(num)}-mr.png')
+        x.save(self.results_path / f'i{str(num).zfill(3)}-mr.png')
 
     def generate_truncated(self, style, noi=np.zeros([44]), trunc=0.5, outImage=False, num=0):
 
@@ -584,7 +595,7 @@ class StyleGAN(object):
         with open(self.model_path / f'{name}.json', "w") as json_file:
             json_file.write(json)
 
-        model.save_weights(self.model_path / f'{name}_{str(num)}.h5')
+        model.save_weights(self.model_path / f'{name}_{str(num).zfill(3)}.h5')
 
     def load_model(self, name, num):
         file = open(self.model_path / f'{name}.json', 'r')
@@ -592,7 +603,7 @@ class StyleGAN(object):
         file.close()
 
         mod = model_from_json(json, custom_objects={'Conv2DMod': Conv2DMod})
-        mod.load_weights(self.model_path / f'{name}_{str(num)}.h5')
+        mod.load_weights(self.model_path / f'{name}_{str(num).zfill(3)}.h5')
 
         return mod
 
@@ -619,7 +630,9 @@ class StyleGAN(object):
 
 if __name__ == "__main__":
     model = StyleGAN(dataset='dresses', lr=0.002, verbose=True, latent_size=512, img_size=256)
-    model.GAN.steps = 1
+    model.GAN.steps = 201
+    #check resuming and specifying the right steps
+    model.load(2)
 
     while model.GAN.steps <= model.max_steps:
         model.train()
