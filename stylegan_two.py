@@ -32,17 +32,12 @@ def hinge_d(y_true, y_pred):
 def w_loss(y_true, y_pred):
     return K.mean(y_true * y_pred)
 
-
 # Lambdas
 def crop_to_fit(x):
     height = x[1].shape[1]
     width = x[1].shape[2]
 
     return x[0][:, :height, :width, :]
-
-
-def upsample(x):
-    return K.resize_images(x, 2, 2, "channels_last", interpolation='bilinear')
 
 
 class GAN(object):
@@ -165,7 +160,11 @@ class GAN(object):
 
         x = Dense(1, kernel_initializer='he_uniform')(x)
 
+<<<<<<< HEAD
         self.D = Model(inputs=inp, outputs=x, name = "Descriminator")
+=======
+        self.D = Model(inputs = inp, outputs = x, name = "Descriminator")
+>>>>>>> robgon-art-master
 
         return self.D
 
@@ -243,7 +242,11 @@ class GAN(object):
         x = Lambda(lambda y: y / 2 + 0.5)(
             x)  # Use values centered around 0, but normalize to [0, 1], providing better initialization
 
+<<<<<<< HEAD
         self.G = Model(inputs=inp_style + [inp_noise], outputs=x, name = "Generator")
+=======
+        self.G = Model(inputs = inp_style + [inp_noise], outputs = x, name="Generator")
+>>>>>>> robgon-art-master
 
         return self.G, self.S
 
@@ -442,9 +445,15 @@ class StyleGAN(object):
             print()
 
             # Save Model
+<<<<<<< HEAD
             if self.GAN.steps % 100 == 0:
                 self.save(floor(self.GAN.steps / 100))
                 self.evaluate(floor(self.GAN.steps / 100))
+=======
+            if self.GAN.steps % 1000 == 0:
+                self.save(floor(self.GAN.steps / 1000))
+                self.evaluate(floor(self.GAN.steps / 1000))
+>>>>>>> robgon-art-master
 
         printProgressBar(self.GAN.steps % 100, 99, decimals=0)
 
@@ -635,4 +644,17 @@ if __name__ == "__main__":
     model.load(2)
 
     while model.GAN.steps <= model.max_steps:
+<<<<<<< HEAD
         model.train()
+=======
+        model.train()
+
+    """
+    model.load(31)
+    n1 = noiseList(64)
+    n2 = nImage(64)
+    for i in range(50):
+        print(i, end = '\r')
+        model.generateTruncated(n1, noi = n2, trunc = i / 50, outImage = True, num = i)
+    """
+>>>>>>> robgon-art-master
