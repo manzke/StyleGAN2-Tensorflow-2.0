@@ -1,7 +1,8 @@
-<<<<<<< HEAD
 Original work: https://github.com/manicman1999/StyleGAN2-Tensorflow-2.0
 
 Pulled in changes from the forks to combine them into one and started rewriting it.
+
+The goal was to have a StyleGAN2 implementation which can run on an Apple MacBook Pro M1 Pro/Max using the GPU.
 
 Modifications from:
 - https://github.com/StuartFarmer
@@ -10,16 +11,6 @@ Modifications from:
 - https://github.com/Fofeu
 - https://github.com/robgon-art
 - https://github.com/leoHeidel
-=======
-A modification of StyleGAN2 Tensorflow 2.0 to make it easily runnable on colab. Using less storage thanks to tensorflow 2 data pipeline.
-
-Was tested on CelebA dataset. 
-
-
-
-# *original README*
-
->>>>>>> ee414dd2d0984f8bf9f26131908a9e36648e22b1
 
 # StyleGAN2 Tensorflow 2.0
 

@@ -152,13 +152,18 @@ class GAN(object):
             return self.D
 
         inp = Input(shape=[self.img_size, self.img_size, 3])
-        x = self.d_block(inp, 1 * self.cha)  # 256
-        x = self.d_block(x, 2 * self.cha)  # 128
-        x = self.d_block(x, 4 * self.cha)  # 64
-        x = self.d_block(x, 6 * self.cha)  # 32
-        x = self.d_block(x, 8 * self.cha)  # 16
-        x = self.d_block(x, 16 * self.cha)  # 8
-        x = self.d_block(x, 32 * self.cha, p = False)  #4
+        x = self.d_block(inp, 1 * self.cha)  # orig: 128 alternate: 256
+        x = self.d_block(x, 2 * self.cha)  # orig: 64 alternate: 128
+        x = self.d_block(x, 4 * self.cha)  # orig: 32 alternate: 64
+
+        if use_orig_impl:
+            x = self.d_block(x, 8 * self.cha)  # 16
+            x = self.d_block(x, 16 * self.cha, p = False)  # 8    
+        else:
+            x = self.d_block(x, 6 * self.cha)  # 32
+            x = self.d_block(x, 8 * self.cha)  # 16
+            x = self.d_block(x, 16 * self.cha)  # 8
+            x = self.d_block(x, 32 * self.cha, p = False)  #4
 
         x = Flatten()(x)
         x = Dense(1, kernel_initializer='he_uniform')(x)
@@ -199,18 +204,29 @@ class GAN(object):
         x = Reshape([4, 4, 4 * self.cha])(x)
         x, r = self.g_block(x, inp_style[0], inp_noise, 32 * self.cha, u=False)  # 4
         outs.append(r)
-        x, r = self.g_block(x, inp_style[1], inp_noise, 16 * self.cha)  # 8
-        outs.append(r)
-        x, r = self.g_block(x, inp_style[2], inp_noise, 8 * self.cha)  # 16
-        outs.append(r)
-        x, r = self.g_block(x, inp_style[3], inp_noise, 6 * self.cha)  # 32
-        outs.append(r)
-        x, r = self.g_block(x, inp_style[4], inp_noise, 4 * self.cha)  # 64
-        outs.append(r)
-        x, r = self.g_block(x, inp_style[5], inp_noise, 2 * self.cha)  # 128
-        outs.append(r)
-        x, r = self.g_block(x, inp_style[6], inp_noise, 1 * self.cha)  # 256
-        outs.append(r)
+
+        if use_orig_impl:
+            x, r = self.g_block(x, inp_style[1], inp_noise, 8 * self.cha)  # 16
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[2], inp_noise, 4 * self.cha)  # 64
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[3], inp_noise, 2 * self.cha)  # 128
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[4], inp_noise, 1 * self.cha)  # 256
+            outs.append(r)
+        else:    
+            x, r = self.g_block(x, inp_style[1], inp_noise, 16 * self.cha)  # 8
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[2], inp_noise, 8 * self.cha)  # 16
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[3], inp_noise, 6 * self.cha)  # 32
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[4], inp_noise, 4 * self.cha)  # 64
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[5], inp_noise, 2 * self.cha)  # 128
+            outs.append(r)
+            x, r = self.g_block(x, inp_style[6], inp_noise, 1 * self.cha)  # 256
+            outs.append(r)
 
         x = add(outs)
         x = Lambda(lambda y: y / 2 + 0.5)(x)  # Use values centered around 0, but normalize to [0, 1], providing better initialization
