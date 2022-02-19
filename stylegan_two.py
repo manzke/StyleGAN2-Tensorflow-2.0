@@ -18,6 +18,7 @@ from conv_mod import *
 use_bce_loss = False
 num_style_layers = 4
 snap = 100
+use_orig_impl = False
 
 # Loss functions
 def gradient_penalty(samples, output, weight):
@@ -27,7 +28,10 @@ def gradient_penalty(samples, output, weight):
 
     # (weight / 2) * ||grad||^2
     # Penalize the gradient norm
-    return K.mean(_gradient_penalty) * weight * 0.5 #originally manicman was with out * 0.5
+    if use_orig_impl:
+        return K.mean(_gradient_penalty) * weight
+    else:
+        return K.mean(_gradient_penalty) * weight * 0.5 #originally manicman was with out * 0.5
 
 def hinge_d(y_true, y_pred):
     return K.mean(K.relu(1.0 + (y_true * y_pred)))
@@ -45,7 +49,7 @@ def crop_to_fit(x):
 
 class GAN(object):
 
-    def __init__(self, steps=1, lr=0.0001, latent_size=512, img_size=128, cha=12):
+    def __init__(self, lr=0.0001, latent_size=512, img_size=128, cha=12):
 
         self.latent_size = latent_size
         self.img_size = img_size
@@ -67,7 +71,6 @@ class GAN(object):
 
         # Config
         self.LR = lr
-        self.steps = steps
         self.beta = 0.99
 
         # Init Models
@@ -282,7 +285,7 @@ class GAN(object):
 
 class StyleGAN(object):
 
-    def __init__(self, dataset, data_path='Data', model_path='Models', results_path='Results', steps=1, max_steps = 25000, lr=0.0001, verbose=True, latent_size=512, img_size=256, batch_size=64):
+    def __init__(self, dataset, data_path='Data', model_path='Models', results_path='Results', steps=0, max_steps = 25000, lr=0.0001, verbose=True, latent_size=512, img_size=256, batch_size=64):
         self.dataset = dataset
 
         self.max_steps = max_steps
@@ -305,7 +308,7 @@ class StyleGAN(object):
         self.batch_size = batch_size
 
         # Init GAN and Eval Models
-        self.GAN = GAN(steps=steps, lr=lr, latent_size=latent_size, img_size=img_size)
+        self.GAN = GAN(lr=lr, latent_size=latent_size, img_size=img_size)
         self.GAN.gen_model()
         self.GAN.gen_model_a()
 
@@ -319,6 +322,9 @@ class StyleGAN(object):
         # Set up variables
         self.startblip = time.time()
         self.lastblip = time.time()
+        self.steps = steps
+        self.nimg = steps * batch_size
+
 
         self.verbose = verbose
 
@@ -357,8 +363,8 @@ class StyleGAN(object):
             style = self.noise_list(self.batch_size)
 
         # Apply penalties every 16 steps
-        apply_gradient_penalty = self.GAN.steps % 2 == 0 or self.GAN.steps < 10000
-        apply_path_penalty = self.GAN.steps % 16 == 0
+        apply_gradient_penalty = self.steps % 2 == 0 or self.steps < 10000
+        apply_path_penalty = self.steps % 16 == 0
 
         a, b, c, d = self.train_step(
             self.im.get_batch(self.batch_size).astype('float32'),
@@ -367,6 +373,9 @@ class StyleGAN(object):
             apply_gradient_penalty,
             apply_path_penalty
         )
+        
+        self.nimg += self.batch_size
+        #print("processing nimg {} with batchsize {}".format(self.nimg, self.batch_size))
 
         # Adjust path length penalty mean
         # d = pl_mean when no penalty is applied
@@ -374,10 +383,10 @@ class StyleGAN(object):
             self.pl_mean = np.mean(d)
         self.pl_mean = 0.99 * self.pl_mean + 0.01 * np.mean(d)
 
-        if self.GAN.steps % 10 == 0 and self.GAN.steps > 20000:
+        if self.steps % 10 == 0 and self.steps > 20000:
             self.GAN.ema()
 
-        if self.GAN.steps <= 25000 and self.GAN.steps % 1000 == 2:
+        if self.steps <= 25000 and self.steps % 1000 == 2:
             self.GAN.ma_init()
 
         if np.isnan(a):
@@ -385,8 +394,8 @@ class StyleGAN(object):
             exit()
 
         #Print info
-        if self.GAN.steps % 100 == 0 and self.verbose:
-            print("\n\nRound " + str(self.GAN.steps) + ":")
+        if self.steps % 100 == 0 and self.verbose:
+            print("\n\nRound " + str(self.steps) + ":")
             print("D:", np.array(a))
             print("G:", np.array(b))
             print("PL:", self.pl_mean)
@@ -406,8 +415,9 @@ class StyleGAN(object):
             min1k = floor(1000 / steps_per_minute)
             sec1k = floor(1000 / steps_per_second) % 60
             print("1k Steps: " + str(min1k).zfill(2) + "m" + str(sec1k).zfill(2) + "s")
+            print("processed images: " + str(floor(self.nimg / 1000)) + "kimg")
 
-            steps_left = self.max_steps - self.GAN.steps + 1e-7
+            steps_left = self.max_steps - self.steps + 1e-7
             hours_left = steps_left // steps_per_hour
             minutes_left = (steps_left // steps_per_minute) % 60
 
@@ -415,13 +425,13 @@ class StyleGAN(object):
             print()
 
             # Save Model
-            if self.GAN.steps % snap == 0:
-                self.save(floor(self.GAN.steps / 100))
-                self.evaluate(floor(self.GAN.steps / 100))
+            if self.steps % snap == 0:
+                self.save(floor(self.steps / 100))
+                self.evaluate(floor(self.steps / 100))
 
-        printProgressBar(self.GAN.steps % 100, 99, decimals=0)
+        printProgressBar(self.steps % 100, 99, decimals=0)
 
-        self.GAN.steps = self.GAN.steps + 1
+        self.steps += 1
 
     @tf.function
     def train_step(self, images, style, noise, perform_gp=True, perform_pl=False):
@@ -609,12 +619,12 @@ class StyleGAN(object):
 
 
 if __name__ == "__main__":
-    model = StyleGAN(dataset='dresses', lr=0.002, verbose=True, latent_size=512, img_size=256)
-    model.GAN.steps = 1701
+    model = StyleGAN(dataset='dresses', lr=0.0001, verbose=True, latent_size=512, img_size=256)
+    #model.steps = 3800
     #check resuming and specifying the right steps
-    model.load(17)
+    #model.load(38)
 
-    while model.GAN.steps <= model.max_steps:
+    while model.steps <= model.max_steps:
         model.train()
 
     """
